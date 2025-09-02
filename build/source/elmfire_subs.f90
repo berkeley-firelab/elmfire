@@ -1054,7 +1054,7 @@ INTEGER, INTENT(IN)      :: IX, IY
 REAL, INTENT(IN) :: T
  
 TYPE(NODE), POINTER :: NP
-TYPE(NODE_WRAPPER), ALLOCATABLE :: TEMP(:)  ! Temporary array for resizing DWI_SU
+! TYPE(NODE_WRAPPER), ALLOCATABLE :: TEMP(:)  ! Temporary array for resizing DWI_SU
 INTEGER :: N  ! Store the new count DWI_SU
 
 ! If the list is empty
@@ -1078,7 +1078,13 @@ DL2%TAIL%TIME_ADDED =  T
 DL2%TAIL%IFBFM   =  FBFM%I2(IX,IY,1)
 
 #ifdef _WUI
-IF (USE_BLDG_SPREAD_MODEL) DL2%TAIL%IBLDGFM =  BLDG_FUEL_MODEL%I2(IX,IY,1)
+IF (USE_BLDG_SPREAD_MODEL) THEN
+   IF (FBFM%I2(IX,IY,1) .EQ. 91) THEN
+      DL2%TAIL%IBLDGFM =  BLDG_FUEL_MODEL%I2(IX,IY,1)
+   ELSE
+      DL2%TAIL%IBLDGFM =  BLDG_FUEL_MODEL_CONSTANT
+   ENDIF
+ENDIF
 #endif
 
 DL2%TAIL%ADJ     =  ADJ%R4(IX,IY,1)
@@ -1088,57 +1094,57 @@ DL2%TAIL%PREV       => NP
 DL2%TAIL%PREV%NEXT  => DL2%TAIL
 
 #ifdef _WUI
-! Resize NODE_POINTERS array dynamically DWI_SU
-ALLOCATE(TEMP(N-1))
-TEMP = DL2%NODE_POINTERS
-DEALLOCATE(DL2%NODE_POINTERS)
-ALLOCATE(DL2%NODE_POINTERS(N))
-DL2%NODE_POINTERS(1:N-1) = TEMP
-DEALLOCATE(TEMP) 
+! ! Resize NODE_POINTERS array dynamically DWI_SU
+! ALLOCATE(TEMP(N-1))
+! TEMP = DL2%NODE_POINTERS
+! DEALLOCATE(DL2%NODE_POINTERS)
+! ALLOCATE(DL2%NODE_POINTERS(N))
+! DL2%NODE_POINTERS(1:N-1) = TEMP
+! DEALLOCATE(TEMP) 
 
-! Store the new node in the array DWI_SU
-NULLIFY(DL2%NODE_POINTERS(N)%PTR)
-DL2%NODE_POINTERS(N)%PTR => DL2%TAIL
+! ! Store the new node in the array DWI_SU
+! NULLIFY(DL2%NODE_POINTERS(N)%PTR)
+! DL2%NODE_POINTERS(N)%PTR => DL2%TAIL
 #endif
 ! *****************************************************************************   
 END SUBROUTINE APPEND
 ! *****************************************************************************
 
-! *****************************************************************************
-SUBROUTINE APPEND_TO_DYNAMIC_ARRAY(IX, IY, N_ROWS, DYNAMIC_ARRAY)
-! *****************************************************************************
+! ! *****************************************************************************
+! SUBROUTINE APPEND_TO_DYNAMIC_ARRAY(IX, IY, N_ROWS, DYNAMIC_ARRAY)
+! ! *****************************************************************************
 
-    INTEGER, INTENT(IN) :: IX, IY                         ! NEW_VALUES_TO_APPEND
-    INTEGER, INTENT(INOUT) :: N_ROWS   
-    REAL, ALLOCATABLE, INTENT(INOUT), DIMENSION(:,:) :: DYNAMIC_ARRAY  ! Dynamic 2D array to store IX and IY
-
-
-    ! Local temporary array for resizing
-    INTEGER, ALLOCATABLE, DIMENSION(:,:) :: TEMP_ARRAY
-
-    ! Handle the case where the array is unallocated
-    IF (N_ROWS .LE. 1) THEN
-        ALLOCATE(DYNAMIC_ARRAY(1, 2))           ! Allocate first column
-        DYNAMIC_ARRAY(1, 1) = IX
-        DYNAMIC_ARRAY(1, 2) = IY
-        N_ROWS = 1                              ! Set number of rows to 1
-    ELSE
-        ! Allocate a temporary array with one additional column
-        ALLOCATE(TEMP_ARRAY(N_ROWS, 2))
-        TEMP_ARRAY(1:N_ROWS-1, :) = DYNAMIC_ARRAY  ! Copy existing data
-        TEMP_ARRAY(N_ROWS, 1) = IX           ! Add new IX value
-        TEMP_ARRAY(N_ROWS, 2) = IY           ! Add new IY value
-
-        ! Replace the old array with the resized one
-        DEALLOCATE(DYNAMIC_ARRAY)
-        ALLOCATE(DYNAMIC_ARRAY(N_ROWS, 2))
-        DYNAMIC_ARRAY = TEMP_ARRAY
-    END IF
+!     INTEGER, INTENT(IN) :: IX, IY                         ! NEW_VALUES_TO_APPEND
+!     INTEGER, INTENT(INOUT) :: N_ROWS   
+!     REAL, ALLOCATABLE, INTENT(INOUT), DIMENSION(:,:) :: DYNAMIC_ARRAY  ! Dynamic 2D array to store IX and IY
 
 
-! *****************************************************************************
-END SUBROUTINE APPEND_TO_DYNAMIC_ARRAY
-! *****************************************************************************
+!     ! Local temporary array for resizing
+!     INTEGER, ALLOCATABLE, DIMENSION(:,:) :: TEMP_ARRAY
+
+!     ! Handle the case where the array is unallocated
+!     IF (N_ROWS .LE. 1) THEN
+!         ALLOCATE(DYNAMIC_ARRAY(1, 2))           ! Allocate first column
+!         DYNAMIC_ARRAY(1, 1) = IX
+!         DYNAMIC_ARRAY(1, 2) = IY
+!         N_ROWS = 1                              ! Set number of rows to 1
+!     ELSE
+!         ! Allocate a temporary array with one additional column
+!         ALLOCATE(TEMP_ARRAY(N_ROWS, 2))
+!         TEMP_ARRAY(1:N_ROWS-1, :) = DYNAMIC_ARRAY  ! Copy existing data
+!         TEMP_ARRAY(N_ROWS, 1) = IX           ! Add new IX value
+!         TEMP_ARRAY(N_ROWS, 2) = IY           ! Add new IY value
+
+!         ! Replace the old array with the resized one
+!         DEALLOCATE(DYNAMIC_ARRAY)
+!         ALLOCATE(DYNAMIC_ARRAY(N_ROWS, 2))
+!         DYNAMIC_ARRAY = TEMP_ARRAY
+!     END IF
+
+
+! ! *****************************************************************************
+! END SUBROUTINE APPEND_TO_DYNAMIC_ARRAY
+! ! *****************************************************************************
 
 ! *****************************************************************************
 ELEMENTAL SUBROUTINE INIT(DL2, IX, IY, T)
