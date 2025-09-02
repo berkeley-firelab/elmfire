@@ -1,0 +1,364 @@
+! ===============================================================================================================================
+! Run Name: Berkeley, CA Example Fire Simulation
+! Contact: [Email]
+!
+! Note:  This example case includes ALL of the inputs for use of ELMFIRE
+!        with the WUI, spotting, and other models implemented.
+!        See elmfire_namelists.f90 for complete collection of namelists and defaults.
+!        This file is structured with ALL parameters and defaults as reference.
+! ===============================================================================================================================
+
+&INPUTS ! =======================================================================================================================
+! -- Fuels and Topography Settings -------------------------------------------------------------------------------------------- !
+FUELS_AND_TOPOGRAPHY_DIRECTORY          = './inputs'                    ! Directory with fuel and topog .tifs
+DEM_FILENAME                            = 'dem'                         ! Digital elevation model raster
+SLP_FILENAME                            = 'slp'                         ! Topographic slope (deg)
+ASP_FILENAME                            = 'asp'                         ! Topographic aspect (deg)
+FBFM_FILENAME                           = 'fbfm40'                      ! Fire behavior fuel model
+ADJ_FILENAME                            = 'adj'                         ! Surface spread rate adjustment
+PHI_FILENAME                            = 'phi'                         ! Initial level set variable
+
+! -- Canopy Fuel Settings ----------------------------------------------------------------------------------------------------- !
+CBD_FILENAME                            = 'cbd'                         ! Canopy bulk density (100 kg/m3)
+CBH_FILENAME                            = 'cbh'                         ! Canopy base height (10 m)
+CC_FILENAME                             = 'cc'                          ! Canopy cover (%)
+CH_FILENAME                             = 'ch'                          ! Canopy height (10 m)
+
+! -- Canopy Conversion Flags -------------------------------------------------------------------------------------------------- !
+CBD_TIMES_100                           = .TRUE.                        ! Multiply canopy bulk density by 100
+CBH_TIMES_10                            = .TRUE.                        ! Multiply canopy base height by 10
+CC_IN_PERCENT                           = .TRUE.                        ! Interpret canopy cover as percent
+CH_TIMES_10                             = .TRUE.                        ! Multiply canopy height by 10
+
+! -- Weather Settings - ------------------------------------------------------------------------------------------------------- !
+WEATHER_DIRECTORY                       = './inputs'                    ! Directory with weather .tifs
+DT_METEOROLOGY                          = 3600.0                        ! Time step between weather bands (s)
+WS_FILENAME                             = 'ws'                          ! 20-ft wind speed (mph)
+WD_FILENAME                             = 'wd'                          ! 20-ft wind direction (deg)
+WS_AT_10M                               = .FALSE.                       ! Provide wind speed at 10m instead of 20ft
+
+! -- Fuel Moisture Settings  -------------------------------------------------------------------------------------------------- !
+USE_CONSTANT_LH                         = .FALSE.                       ! Is live herbaceous moisture content spatially constant?
+LH_MOISTURE_CONTENT                     = 60.0                          ! Live-herbaceous moisure content; default 60
+USE_CONSTANT_LW                         = .FALSE.                       ! Is live woody moisture content spatially constant?
+LW_MOISTURE_CONTENT                     = 60.0                          ! Live-woody moisture content; default 60
+USE_CONSTANT_FMC                        = .TRUE.                        ! Use constant foliar moisture?
+FOLIAR_MOISTURE_CONTENT                 = 90.0                          ! default 90
+M1_FILENAME                             = 'm1'                          ! 1-hr dead fuel moisture content raster (%)
+M10_FILENAME                            = 'm10'                         ! 10-hr dead fuel moisture content raster (%)
+M100_FILENAME                           = 'm100'                        ! 100-hr dead fuel moisture content raster (%)
+MLH_FILENAME                            = 'lh'                          ! Live-herbaceous moisture content raster (%)
+MLW_FILENAME                            = 'lw'                          ! Live-woody moisture content raster (%)
+FMC_FILENAME                            = 'fmc'                         ! Foliar moisture content raster (%)
+
+! -- Assets at Risk Settings -------------------------------------------------------------------------------------------------- !
+USE_LAND_VALUE                          = .FALSE.                       ! Enables output of land value impact when .TRUE. ($)
+LAND_VALUE_FILENAME                     = ' '                           ! Raster with land value per cell ($)
+USE_REAL_ESTATE_VALUE                   = .FALSE.                       ! Enables output of real estate impact when .TRUE.
+REAL_ESTATE_VALUE_FILENAME              = ' '                           ! Raster with real estate value per cell
+USE_POPULATION_DENSITY                  = .FALSE.                       ! Enables output of population affected when .TRUE.
+POPULATION_DENSITY_FILENAME             = ' '                           ! Raster with population density per cell
+
+! -- Pyromes and ERC ---------------------------------------------------------------------------------------------------------- !
+PYROMES_FILENAME                        = ' '                           ! Raster with pyrome classifications
+ERC_FILENAME                            = ' '                           ! Raster with Energy Release Component (-)
+
+! -- Ignition Inputs ---------------------------------------------------------------------------------------------------------- !
+IGNITION_MASK_FILENAME                  = ' '                           ! Float32 raster: mask or probabilities of ignition (0–1)
+IGNITIONS_CSV_FILENAME                  = ' '                           ! CSV file with ignition points (ID,X,Y)
+TIMED_LOCATIONS_CSV                     = 'null'                        ! CSV of locations to track time of arrival
+
+! -- Miscellaneous ------------------------------------------------------------------------------------------------------------ !
+GRID_DECLINATION                        = 0.0                           ! Grid rotation angle (degrees), applied to aspect/wind
+ROTATE_ASP                              = .FALSE.                       ! Rotate aspect by declination angle
+ROTATE_WD                               = .FALSE.                       ! Rotate wind by declination angle
+USE_BSQ_XML_HEADER                      = .TRUE.                        ! Read BSQ XML headers (leave TRUE unless needed)
+VRT_INSTEAD_OF_TIF                      = .FALSE.                       ! Use VRT files instead of TIF
+USE_EXISTING_BSQS                       = .FALSE.                       ! Reuse existing BSQ rasters
+USE_TILED_IO                            = .FALSE.                       ! Advanced: tiled I/O
+/
+
+
+&COMPUTATIONAL_DOMAIN ! =========================================================================================================
+A_SRS                                   = 'EPSG:32610'                  ! Coordinate reference system identifier
+COMPUTATIONAL_DOMAIN_CELLSIZE           = 30.0                          ! Cell size (m)
+COMPUTATIONAL_DOMAIN_XLLCORNER          = 0.0                           ! Bottom left corner coordinate,
+COMPUTATIONAL_DOMAIN_YLLCORNER          = 0.0                           ! Leave blank if using Landfire inputs
+/
+
+
+&TIME_CONTROL ! =================================================================================================================
+SIMULATION_TSTART                       = 0.0                           ! Start time for simulation
+SIMULATION_TSTOP                        = 3600.0                        ! Stop time for simulation
+SIMULATION_DT                           = 1.0                           ! Standard timestep
+SIMULATION_DTMAX                        = 15.0                          ! Maximum timestep
+TARGET_CFL                              = 0.4                           ! Target CFL number
+
+! -- Optional Time Control Parameters ----------------------------------------------------------------------------------------- !
+DT_INTERPOLATE_M1                       = 300.0                         ! Interpolation interval for 1-hr moisture (s)
+DT_INTERPOLATE_M10                      = 3000.0                        ! Interpolation interval for 10-hr moisture (s)
+DT_INTERPOLATE_M100                     = 30000.0                       ! Interpolation interval for 100-hr moisture (s)
+DT_INTERPOLATE_MLH                      = 9E8                           ! Live herbaceous moisture interp. (s)
+DT_INTERPOLATE_MLW                      = 9E8                           ! Live woody moisture interp. (s)
+DT_INTERPOLATE_FMC                      = 9E8                           ! Foliar moisture interp. (s)
+DT_INTERPOLATE_WIND                     = 300.0                         ! Wind field interpolation interval (s)
+
+BAND_ONE_HOUR_OF_YEAR                   = 0                             ! Start hour of year for meteorology band 1
+HOUR_OF_YEAR                            = 4368                          ! Simulation start hour of year
+CURRENT_YEAR                            = 1970                          ! Simulation year
+FORECAST_START_HOUR                     = 20.0                          ! Forecast start hour
+LATITUDE                                = -40.0                         ! Domain center latitude
+LONGITUDE                               = -120.0                        ! Domain center longitude
+
+BURN_PERIOD_CENTER_FRAC                 = 0.667                         ! Burn period center fraction
+BURN_PERIOD_LENGTH                      = 10.0                          ! Burn period length (hours)
+OVERNIGHT_ADJUSTMENT_FACTOR             = 0.1                           ! Adjustment factor overnight
+
+SUNRISE_HOUR                            = 13.0                          ! UTC sunrise hour
+SUNSET_HOUR                             = 27.0                          ! UTC sunset hour
+USE_DIURNAL_ADJUSTMENT_FACTOR           = .FALSE.                       ! Apply diurnal adjustment
+RANDOMIZE_SIMULATION_TSTOP              = .FALSE.                       ! Randomize stop time
+/
+
+
+&SIMULATOR ! ====================================================================================================================
+MODE                                    = 1                             ! =1 transient simulation; =2 landscape fire potential
+NUM_IGNITIONS                           = 1                             ! Number of initial ignitions
+X_IGN(1)                                = 0                             ! x-coordinate of ignition 1 (m)
+Y_IGN(1)                                = 0                             ! y-coordinate of ignition 1 (m)
+T_IGN(1)                                = 0.0                           ! Time of ignition 1 (s)
+ALLOW_NONBURNABLE_PIXEL_IGNITION        = .TRUE.
+
+! -- Wind Fluctuation Settings ------------------------------------------------------------------------------------------------ !
+WIND_FLUCTUATIONS                       = .FALSE.                       ! Directs ELMFIRE to perturb the wind field
+DT_WIND_FLUCTUATIONS                    = 15.0                          ! How often to perturb wind field (s)
+WIND_DIRECTION_FLUCTUATION_INTENSITY    = 0.0                           ! How intense wind direction perturbed (deg)
+WIND_SPEED_FLUCTUATION_INTENSITY        = 0.0                           ! How intense wind speed perturbed
+
+! -- Crown Fire Settings ------------------------------------------------------------------------------------------------------ !
+CROWN_FIRE_MODEL                        = 1                             ! Crown fire model type (=0 disabled) [Cruz et al 2005]
+CROWN_FIRE_SPREAD_RATE_LIMIT            = 250.0                         ! Max spread rate for crown fire (ft/min)
+CRITICAL_CANOPY_COVER                   = 0.39                          ! Minimum canopy cover for crown fire
+CROWN_FIRE_ADJ                          = 1.0                           ! Adjustment factor for crown fire spread
+CROWN_RATIO                             = 1.0                           ! Ratio of active to passive crown fire
+
+! -- Misc Settings ------------------------------------------------------------------------------------------------------------ !
+BANDTHICKNESS                           = 2                             ! Narrow band width
+DEBUG_LEVEL                             = 1                             ! Debug verbosity level
+UNTAG_CELLS_TIMESTEP_INTERVAL           = 10                            ! Interval to untag cells
+UNTAG_TYPE_2                            = .FALSE.                       ! Advanced untag option
+UNTAG_TYPE_3                            = .FALSE.                       ! Advanced untag option
+RANDOMIZE_RANDOM_SEED                   = .FALSE.                       ! Use clock for random seed
+MAX_RUNTIME                             = 999999.0                      ! Max wall clock runtime (s)
+PHIS_ADJ                                = 1.0                           ! Spread adjustment φ_s
+PHIW_ADJ                                = 1.0                           ! Spread adjustment φ_w
+PLIGNRATE_MIN                           = 0.0                           ! Min ignition probability
+SURFACE_ACCELERATION_TIME_CONSTANT      = 1.0                           ! Surface acceleration time constant
+WSMFEFF_LOW_MULT                        = 5.07955E-3                    ! Low fuel moisture multiplier
+MULTIPLE_HOSTS                          = .FALSE.                       ! Enable MPI over multiple hosts
+NUM_NODES_OMP_THRESHOLD                 = 999999999                     ! Threshold for OpenMP
+USE_PYROMES                             = .FALSE.                       ! Use pyrome raster
+WX_BILINEAR_INTERPOLATION               = .FALSE.                       ! Bilinear interpolation of wind
+/
+
+
+&SPOTTING ! =====================================================================================================================
+! -- Spotting Toggle ---------------------------------------------------------------------------------------------------------- !
+ENABLE_SPOTTING                         = .FALSE.                       ! Enables spotting simulation
+ENABLE_SURFACE_FIRE_SPOTTING            = .FALSE.                       ! Allows surface fires to produce embers
+STOCHASTIC_SPOTTING                     = .FALSE.                       ! Use random ember dispersal (not currently active)
+SPOTTING_DISTRIBUTION_TYPE              = 'LOGNORMAL'                   ! Distribution: 'LOGNORMAL' or 'NORMAL'
+USE_SUPERSEDED_SPOTTING                 = .TRUE.                        ! Use older spotting model
+USE_EULERIAN_SPOTTING                   = .FALSE.                       ! Grid-based ember tracking
+USE_EMBER_IGNITION_MODEL                = .FALSE.                       ! Physical ignition model
+USE_SIMPLE_IGNITION_MODEL               = .TRUE.                        ! Simple ember ignition model
+USE_PHYSICAL_SPOTTING_DURATION          = .FALSE.                       ! Model ember duration
+USE_PHYSICAL_EMBER_NUMBER               = .FALSE.                       ! Model ember counts physically
+USE_CUSTOMIZED_PDF                      = .FALSE.                       ! Use custom probability distributions
+BUILD_EMBER_FLUX_TABLE                  = .FALSE.                       ! Build ember flux lookup table
+NO_SURFACE_FIRE                         = .FALSE.                       ! Suppress surface fire ember generation
+USE_HALF_CFL_DT_FOR_SPOTTING            = .FALSE.                       ! Half timestep for spotting
+
+! -- Ember Generation and Dispersal ------------------------------------------------------------------------------------------- !
+EMBER_GR                                = 1E-3                          ! g/m2 embers
+EMBER_GR_PER_MW_BLDG                    = 10.0                          ! g/MW from buildings
+EMBER_GR_PER_MW_VEGE                    = 33.3                          ! g/MW from vegetation
+EMBER_SAMPLING_FACTOR                   = 1.0                           ! Sampling density multiplier
+TAU_EMBERGEN                            = 6.0                           ! Ember decay constant (s)
+DT_DUMP_EMBER_FLUX                      = 30                            ! Ember flux dump interval (s)
+
+! -- Spotting Probability ----------------------------------------------------------------------------------------------------- !
+PIGN                                    = 1.0                           ! Default ignition probability (%)
+PIGN_MIN                                = 1.0                           ! Min ignition probability (%)
+PIGN_MAX                                = 1.0                           ! Max ignition probability (%)
+P_EPS                                   = 0.01                          ! Ignition threshold probability
+
+! -- Spotting Distance -------------------------------------------------------------------------------------------------------- !
+MEAN_SPOTTING_DIST                      = 0.0                           ! Base mean spotting distance (m)
+MEAN_SPOTTING_DIST_MIN                  = 0.0                           ! Minimum mean spotting distance (m) for ensemble runs
+MEAN_SPOTTING_DIST_MAX                  = 0.0                           ! Maximum mean spotting distance (m) for ensemble runs
+MIN_SPOTTING_DISTANCE                   = 0.0                           ! Absolute minimum spotting distance (m)
+MAX_SPOTTING_DISTANCE                   = 0.0                           ! Absolute maximum spotting distance (m)
+NORMALIZED_SPOTTING_DIST_VARIANCE       = 0.0                           ! Base variance of normalized spotting distance (m)
+NORMALIZED_SPOTTING_DIST_VARIANCE_MIN   = 0.0                           ! Minimum variance in ensemble (m)
+NORMALIZED_SPOTTING_DIST_VARIANCE_MAX   = 0.0                           ! Maximum variance in ensemble (m)
+
+! -- Wind & Fireline Scaling -------------------------------------------------------------------------------------------------- !
+SPOT_WS_EXP                             = 0.9                           ! Exponent scaling effect of wind speed on spotting distance
+SPOT_WS_EXP_LO                          = 0.9                           ! Lower bound exponent for wind speed scaling
+SPOT_WS_EXP_HI                          = 0.9                           ! Upper bound exponent for wind speed scaling
+SPOT_FLIN_EXP                           = 0.5                           ! Exponent scaling effect of fireline intensity on spotting
+SPOT_FLIN_EXP_LO                        = 0.5                           ! Lower bound exponent for fireline intensity scaling
+SPOT_FLIN_EXP_HI                        = 0.5                           ! Upper bound exponent for fireline intensity scaling
+
+! -- Crown Fire Spotting ------------------------------------------------------------------------------------------------------ !
+CROWN_FIRE_SPOTTING_PERCENT             = 100.0                         ! % of embers originating from crown fire
+CROWN_FIRE_SPOTTING_PERCENT_MIN         = 100.0                         ! Minimum % in ensemble
+CROWN_FIRE_SPOTTING_PERCENT_MAX         = 100.0                         ! Maximum % in ensemble
+CRITICAL_SPOTTING_FIRELINE_INTENSITY    = 0.0                           ! Minimum fireline intensity (kW/m) needed to generate embers
+
+! -- Surface Fire Spotting ---------------------------------------------------------------------------------------------------- !
+GLOBAL_SURFACE_FIRE_SPOTTING_PERCENT     = 0.0                          ! % of embers from surface fire
+GLOBAL_SURFACE_FIRE_SPOTTING_PERCENT_MIN = 0.0                          ! Minimum % for ensemble
+GLOBAL_SURFACE_FIRE_SPOTTING_PERCENT_MAX = 0.0                          ! Maximum % for ensemble
+SURFACE_FIRE_SPOTTING_PERCENT_MULT       = 1.0                          ! Multiplier scaling surface fire ember generation
+SURFACE_FIRE_SPOTTING_PERCENT            = 100.0                        ! % embers from surface fire per cell
+
+! -- Ember Count -------------------------------------------------------------------------------------------------------------- !
+NEMBERS_MIN                             = 30                            ! Minimum embers released per event
+NEMBERS_MIN_HI                          = 0                             ! High-end min embers for ensemble
+NEMBERS_MIN_LO                          = 0                             ! Low-end min embers for ensemble
+NEMBERS_MAX                             = 1                             ! Maximum embers released per event
+NEMBERS_MAX_HI                          = 1                             ! High-end max embers for ensemble
+NEMBERS_MAX_LO                          = 1                             ! Low-end max embers for ensemble
+
+! -- Ignition Timing ---------------------------------------------------------------------------------------------------------- !
+LOCAL_IGNITION_TIME                     = 30.0                          ! Delay (s) before ignition after ember deposition
+CELL_IGNITION_DELAY                     = 100.0                         ! Delay (s) before cell fully ignites after ignition triggered
+
+! -- Custom Distribution ------------------------------------------------------------------------------------------------------ !
+MU_CROSSWIND                            = 0.0                           ! Mean crosswind distance offset (m)
+SIGMA_CROSSWIND                         = 0.0                           ! Std dev of crosswind spread (m)
+MU_DOWNWIND                             = 0.0                           ! Mean downwind distance offset (m)
+SIGMA_DOWNWIND                          = 0.0                           ! Std dev of downwind spread (m)
+/
+
+
+&MONTE_CARLO ! ==================================================================================================================
+! -- Monte Carlo Simulation Settings ------------------------------------------------------------------------------------------ !
+NUM_ENSEMBLE_MEMBERS                    = 1                             ! Number of simulation members
+RANDOM_IGNITIONS                        = .FALSE.                       ! Enable random ignitions
+RANDOM_IGNITIONS_TYPE                   = 1                             ! Random ignition type (1 = random pixel)
+USE_IGNITION_MASK                       = .FALSE.                       ! Use ignition mask raster
+ADD_TO_IGNITION_MASK                    = -9E9                          ! Value to add to ignition mask
+PERCENT_OF_PIXELS_TO_IGNITE             = 5.0                           ! % of pixels to ignite
+SEED                                    = 2024                          ! Random seed
+EDGEBUFFER                              = 3000.0                        ! Edge buffer distance (m)
+CSV_FIXED_IGNITION_LOCATIONS            = .FALSE.                       ! Use CSV with fixed ignition locations
+
+! -- Meteorology Ensemble Settings -------------------------------------------------------------------------------------------- !
+METEOROLOGY_BAND_START                  = -1                            ! First meteorology band index (1-based)
+METEOROLOGY_BAND_STOP                   = -1                            ! Last meteorology band index
+METEOROLOGY_BAND_SKIP_INTERVAL          = -1                            ! Skip interval between bands
+NUM_METEOROLOGY_TIMES                   = 1                             ! Number of meteorology time steps to use
+
+! -- Raster Perturbation Settings --------------------------------------------------------------------------------------------- !
+NUM_RASTERS_TO_PERTURB                  = 0                             ! Number of rasters to perturb
+RASTER_TO_PERTURB(:)                    = ' '                           ! Names of rasters to perturb (ADJ, FBFM, etc.)
+SPATIAL_PERTURBATION(:)                 = ' '                           ! 'GLOBAL' or 'PIXEL' spatial perturbation
+TEMPORAL_PERTURBATION(:)                = ' '                           ! 'STATIC' or 'DYNAMIC' temporal perturbation
+PDF_TYPE(:)                             = ' '                           ! Type of PDF (e.g., 'UNIFORM')
+PDF_LOWER_LIMIT(:)                      = 0.0                           ! Lower bound of perturbation range
+PDF_UPPER_LIMIT(:)                      = 0.0                           ! Upper bound of perturbation range
+
+! -- Wind Fluctuation Perturbation -------------------------------------------------------------------------------------------- !
+WIND_DIRECTION_FLUCTUATION_INTENSITY_MIN = -1.0                         ! Min intensity for wind direction fluctuation
+WIND_DIRECTION_FLUCTUATION_INTENSITY_MAX = -1.0                         ! Max intensity for wind direction fluctuation
+WIND_SPEED_FLUCTUATION_INTENSITY_MIN     = -1.0                         ! Min intensity for wind speed fluctuation
+WIND_SPEED_FLUCTUATION_INTENSITY_MAX     = -1.0                         ! Max intensity for wind speed fluctuation
+
+! -- ERC and Plignrate -------------------------------------------------------------------------------------------------------- !
+USE_ERC                                 = .FALSE.                       ! Use Energy Release Component (ERC) raster
+ERC_IS_PLIGNRATE                        = .FALSE.                       ! Treat ERC as pixel ignition rate
+/
+
+
+&SUPPRESSION ! ==================================================================================================================
+! -- Fire Suppression Settings ------------------------------------------------------------------------------------------------ !
+ENABLE_INITIAL_ATTACK                   = .FALSE.                       ! Enable initial attack suppression model
+INITIAL_ATTACK_TIME                     = 1800.0                        ! Time when initial attack starts (s)
+
+ENABLE_EXTENDED_ATTACK                  = .FALSE.                       ! Enable extended attack model
+DT_EXTENDED_ATTACK                      = 3600.0                        ! Interval between suppression events (s)
+AREA_NO_CONTAINMENT_CHANGE              = 10000.0                       ! Area threshold without containment change
+MAX_CONTAINMENT_PER_DAY                 = 100.0                         ! Max containment rate per day (%)
+B_SDI                                   = 1.0                           ! Calibration constant
+SDI_FACTOR                              = 1.0                           ! Scaling factor for SDI
+USE_SDI                                 = .FALSE.                       ! Use suppression difficulty index
+USE_SDI_LOG_FUNCTION                    = .FALSE.                       ! Use logarithmic SDI function
+/
+
+
+&WUI ! ==========================================================================================================================
+! -- Urban Fire Spread Settings ----------------------------------------------------------------------------------------------- !
+USE_BLDG_SPREAD_MODEL                   = .FALSE.                      ! Enable building spread modeling
+BLDG_SPREAD_MODEL_TYPE                  = 1                            ! 1 = Hamada, 2 = WU-E
+USE_CONSTANT_BLDG_SPREAD_MODEL_PARAMS   = .TRUE.                       ! Use uniform building attributes
+BLDG_FUEL_MODEL_CONSTANT                = 1                            ! Fuel model number for buildings
+BLDG_AREA_CONSTANT                      = 20.0                         ! Building area (m2)
+BLDG_SEPARATION_DIST_CONSTANT           = 10.0                         ! Separation distance (m)
+BLDG_NONBURNABLE_FRAC_CONSTANT          = 0.0                          ! Nonburnable fraction
+BLDG_FOOTPRINT_FRAC_CONSTANT            = 1.0                          ! Building footprint fraction
+GLOBAL_HARDENING_FACTOR                 = 1.0                          ! Factor reducing ignitability
+/
+
+
+&SMOKE ! ========================================================================================================================
+! -- Smoke Emissions Settings ------------------------------------------------------------------------------------------------- !
+ENABLE_SMOKE_OUTPUTS                    = .FALSE.                       ! Enable smoke modeling outputs
+USE_SMOKE_YIELD_BY_FUEL                 = .FALSE.                       ! Use per-fuel smoke yields
+DT_SMOKE_OUTPUTS                        = 3600.0                        ! Interval between smoke output dumps (s)
+PM2P5_RELEASE_MIN_FOR_OUTPUT            = 0.0                           ! Minimum PM2.5 release to trigger output
+SMOKE_HOC                               = 12.0                          ! Heat of combustion (MJ/kg)
+SMOKE_OUTPUTS_DUMP_PERCENT              = 100.0                         ! % of output dumps kept
+SMOKE_YIELD                             = 0.01                          ! Default smoke yield
+SMOKE_YIELD_BY_FUEL(:)                  = 0.01                          ! Per-fuel smoke yields
+/
+
+
+&MISCELLANEOUS ! ================================================================================================================
+PATH_TO_GDAL                            = '/usr/bin'                    ! Path to GDAL executables
+SCRATCH                                 = './scratch'                   ! Scratch directory for temp files
+MISCELLANEOUS_INPUTS_DIRECTORY          = './misc'                      ! Directory for misc inputs
+FUEL_MODEL_FILE                         = 'fuel_models.csv'             ! Fuel model definitions
+BUILDING_FUEL_MODEL_FILE                = 'building_fuel_models.csv'    ! Building fuel models
+/
+
+
+&OUTPUTS ! ======================================================================================================================
+OUTPUTS_DIRECTORY                       = './outputs'                   ! Directory for output files
+CONVERT_TO_GEOTIFF                      = .TRUE.                        ! Convert outputs to GeoTIFF
+
+DTDUMP                                  = 3600.0                        ! Frequency of output dumps (s)
+DUMP_TIMINGS                            = .TRUE.                        ! Output timing logs
+DUMP_PHI                                = .TRUE.                        ! Dump level set function
+DUMP_FIRE_SIZE_STATS                    = .TRUE.                        ! Dump fire size statistics
+DUMP_BINARY_OUTPUTS                     = .FALSE.                       ! Dump .bil files
+ACCUMULATE_EMBER_FLUX                   = .FALSE.                       ! Accumulate ember flux over time
+DUMP_EMBER_FLUX                         = .TRUE.                        ! Dump ember flux rasters
+DUMP_CROWN_FIRE                         = .TRUE.                        ! Dump crown fire occurrence
+DUMP_FLAME_LENGTH                       = .TRUE.                        ! Dump flame length rasters
+DUMP_FLIN                               = .TRUE.                        ! Dump fireline intensity rasters
+DUMP_HPUA                               = .TRUE.                        ! Dump heat per unit area rasters
+DUMP_REACTION_INTENSITY                 = .TRUE.                        ! Dump reaction intensity rasters
+DUMP_SURFACE_FIRE                       = .TRUE.                        ! Dump surface fire rasters
+DUMP_TIME_OF_ARRIVAL                    = .TRUE.                        ! Dump time of arrival rasters
+DUMP_SPREAD_RATE                        = .TRUE.                        ! Dump spread rate rasters
+DUMP_WD20                               = .TRUE.                        ! Dump wind direction rasters
+DUMP_WS20                               = .TRUE.                        ! Dump wind speed rasters
+CALCULATE_TIMES_BURNED                  = .FALSE.                       ! Count number of times a cell burned
+DUMP_SPOTTING_OUTPUTS                   = .FALSE.                       ! Dump spotting outputs
+DUMP_TOTAL_DFC_RECEIVED                 = .TRUE.                        ! Dump cumulative direct flame contact
+DUMP_TOTAL_RAD_RECEIVED                 = .TRUE.                        ! Dump cumulative radiant heat received
+DUMP_HRR_TRANSIENT                      = .TRUE.                        ! Dump transient heat release rate
+/

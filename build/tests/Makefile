@@ -24,7 +24,8 @@ VPATH := ../source \
 	./02-component \
     ./03-integration \
 	./04-regression \
-	./05-performance
+	./05-performance \
+	./06-validation 
 
 # List of test scripts by dir (append for new tests)
 00-UNIT_INDEPENDENT/ELMFIRE_INIT := \
@@ -32,7 +33,6 @@ VPATH := ../source \
 
 00-UNIT_INDEPENDENT/ELMFIRE_LEVEL_SET := \
 	test_calc_cfl \
-	test_calc_normal_vectors \
 	test_half_superbee \
 	test_rk2_integrate
 
@@ -42,14 +42,13 @@ VPATH := ../source \
 00-UNIT_INDEPENDENT/ELMFIRE_SPREAD_RATE := \
 	test_ellipse_ucb \
 	test_hamada \
-	test_surface_spread_rate
 
 00-UNIT_INDEPENDENT/ELMFIRE_SUBS := \
 	test_bilinear_interpolate \
 	test_erfinv \
 	test_get_bilinear_interpolate_coeffs \
 	test_hour_of_year_to_timestamp \
-	test_icol_fine_to_coarse.f90 \
+	test_icol_fine_to_coarse \
 	test_icol_from_x \
 	test_irow_from_y \
 	test_locate \
@@ -62,9 +61,7 @@ VPATH := ../source \
 	test_x_from_icol \
 	test_y_from_irow
 
-01-UNIT_DEPENDENT/ELMFIRE_LEVEL_SET := \
-	test_limit_gradients \
-	test_tag_band
+01-UNIT_DEPENDENT/ELMFIRE_LEVEL_SET :=
 
 01-UNIT_DEPENDENT/ELMFIRE_SPREAD_RATE :=
 
@@ -75,6 +72,8 @@ VPATH := ../source \
 04-REGRESSION :=
 
 05-PERFORMANCE :=
+
+06-VALIDATION :=
 
 # Compile all test files
 ALL_TEST_NAMES := \
@@ -88,7 +87,8 @@ ALL_TEST_NAMES := \
 	$(02-COMPONENT) \
 	$(03-INTEGRATION) \
 	$(04-REGRESSION) \
-	$(05-PERFORMANCE)
+	$(05-PERFORMANCE) \
+	$(06-VALIDATION)
 ALL_TESTS := $(addprefix $(BIN_DIR)/, $(ALL_TEST_NAMES))
 
 # List of ELMFIRE source files
