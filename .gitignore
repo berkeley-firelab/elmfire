@@ -47,3 +47,16 @@ ask_rag.py
 .rag_db
 rag_db
 .webui_secret_key
+
+.DS_Store
+.ipynb_checkpoints
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+.aux
+*.stderr
+*.stdout
+*.synctex.gz
+*.out
+*.toc
