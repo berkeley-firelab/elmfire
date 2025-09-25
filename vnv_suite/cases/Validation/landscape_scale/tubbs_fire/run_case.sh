@@ -36,5 +36,5 @@ fi
 # --- Postprocess & Figures ---
 python3 "$CASE_DIR/scripts/postprocess.py"
 
---- Done ---
+# --- Done ---
 echo "[OK] Done Running $CASE_DIR"
