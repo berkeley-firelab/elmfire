@@ -5,7 +5,7 @@ substitutions:
   _IMAGE: elmfire-vnv                     # Image name
   _JOB_NAME: elmfire-vnv                  # Cloud Run Job name
   _RESULTS_BUCKET: gs://elmfire_vnv_reports
-  _JOB_SA: elmfire-vnv-job@${PROJECT_ID}.iam.gserviceaccount.com
+  _JOB_SA: 535731099861-compute@developer.gserviceaccount.com
   _TASK_COUNT: "2"                        # number of parallel tasks
   _PARALLELISM: "2"                       # <= _TASK_COUNT is typical
 
@@ -51,8 +51,8 @@ steps:
         -e "s|__JOB_NAME__|${_JOB_NAME}|g" \
         -e "s|__RESULTS_BUCKET__|${_RESULTS_BUCKET}|g" \
         -e "s|__JOB_SA__|${_JOB_SA}|g" \
-        -e "s|__TASK_COUNT__|${_TASK_COUNT}|g" \
-        -e "s|__PARALLELISM__|${_PARALLELISM}|g" \
+        -e "s|__TASK_COUNT__|\"${_TASK_COUNT}\"|g" \
+        -e "s|__PARALLELISM__|\"${_PARALLELISM}\"|g" \
         infra/job.yaml > /workspace/job_resolved.yaml
       echo "[INFO] job_resolved.yaml rendered."
 

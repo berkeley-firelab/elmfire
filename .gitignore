@@ -60,3 +60,5 @@ rag_db
 *.synctex.gz
 *.out
 *.toc
+!vnv_suite/**/misc
+!vnv_suite/**/inputs

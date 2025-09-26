@@ -51,7 +51,8 @@ COPY --from=builder /elmfire /elmfire
 # ---- Python deps for VnV (excluding geospatial already provided via APT) ----
 WORKDIR /elmfire/elmfire/vnv_suite
 RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r requirements.txt
+    python3 -m pip install --no-cache-dir -r requirements.txt \
+    python3 -m pip install --no-cache-dir google-cloud-storage crcmod
 
 # ---- Environment ----
 ENV ELMFIRE_VER=2025.0717 \

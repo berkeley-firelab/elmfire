@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 from math import floor
+from google.cloud import storage
+import mimetypes
 
 def usage():
     return """Usage: run_all.py [OPTIONS]
@@ -112,6 +114,48 @@ def shard_slice(n_items, k_shards, i_index):
     start = floor(i_index * n_items / k_shards)
     end = floor((i_index + 1) * n_items / k_shards)
     return start, end
+
+def upload_tree_to_gcs(local_root: str, bucket_url: str, prefix: str = ""):
+    """
+    Recursively upload local_root to a GCS bucket/prefix.
+    bucket_url: like 'gs://elmfire-vnv-reports'
+    prefix: destination prefix, no leading slash (e.g., 'runs/sha123/task_0')
+    """
+    if not bucket_url.startswith("gs://"):
+        print(f"[WARN] RESULTS_BUCKET must start with gs:// (got {bucket_url}); skipping upload.")
+        return
+
+    bucket_name = bucket_url[5:] if "/" not in bucket_url[5:] else bucket_url[5:].split("/", 1)[0]
+    base_prefix = "" if "/" not in bucket_url[5:] else bucket_url[5+len(bucket_name)+1:]
+    if base_prefix:
+        # allow bucket URL like gs://bucket/some/base/path
+        base_prefix = base_prefix.strip("/")
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+
+    # Normalize prefix
+    full_prefix = "/".join([p for p in [base_prefix, prefix] if p]).strip("/")
+
+    uploaded = 0
+    for root, _, files in os.walk(local_root):
+        for fname in files:
+            local_path = os.path.join(root, fname)
+            rel = os.path.relpath(local_path, local_root)
+            rel = rel.replace("\\", "/")
+            blob_path = "/".join([p for p in [full_prefix, rel] if p])
+
+            blob = bucket.blob(blob_path)
+            content_type, _ = mimetypes.guess_type(fname)
+            if content_type:
+                blob.content_type = content_type
+
+            blob.upload_from_filename(local_path)
+            uploaded += 1
+            if uploaded % 100 == 0:
+                print(f"[INFO] Uploaded {uploaded} files...")
+
+    print(f"[OK] Uploaded {uploaded} file(s) from {local_root} to gs://{bucket_name}/{full_prefix}")
 
 def main():
     parser = argparse.ArgumentParser(add_help=False, usage=usage())
@@ -224,6 +268,23 @@ def main():
         print(f"\n[OK] Submitted {total_shard} job(s) from this shard.")
     else:
         print(f"\n[OK] All {total_shard} case(s) in this shard completed successfully.")
+
+    # Upload results if configured
+    results_bucket = os.getenv("RESULTS_BUCKET", "").strip()
+    dump_dir = os.getenv("DUMP_DIR", "/elmfire/elmfire/vnv_suite").strip()
+    results_prefix = os.getenv("RESULTS_PREFIX", "").strip()
+    task_idx = os.getenv("CLOUD_RUN_TASK_INDEX", "")
+    if results_bucket:
+        # Expand ${CLOUD_RUN_TASK_INDEX} in RESULTS_PREFIX if present
+        results_prefix = results_prefix.replace("${CLOUD_RUN_TASK_INDEX}", task_idx)
+        try:
+            print(f"[INFO] Uploading {dump_dir} to {results_bucket}/{results_prefix} ...")
+            upload_tree_to_gcs(dump_dir, results_bucket, results_prefix)
+        except Exception as e:
+            # Do not hide job success just because upload failed; surface clearly.
+            print(f"[ERROR] Upload to GCS failed: {e}", file=sys.stderr)
+            # choose: either exit nonzero to fail the job, or keep success.
+            # sys.exit(2)
 
 if __name__ == "__main__":
     main()

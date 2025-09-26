@@ -6,12 +6,13 @@ metadata:
 spec:
   template:
     spec:
+      taskCount: __TASK_COUNT__
       parallelism: __PARALLELISM__
       template:
         spec:
           serviceAccountName: __JOB_SA__
-          maxRetries: 0 
-          timeoutSeconds: 3600 
+          maxRetries: "0" 
+          timeoutSeconds: "3600" 
           containers:
           - image: __REGION__-docker.pkg.dev/__PROJECT_ID__/__REPO__/__IMAGE__:__COMMIT_SHA__
             command:
@@ -23,9 +24,9 @@ spec:
               value: __RESULTS_BUCKET__
             - name: COMMIT_SHA
               value: __COMMIT_SHA__
-            - name: CLOUD_RUN_TASK_COUNT
-              value: __TASK_COUNT__
+            - name: RESULTS_PREFIX
+              value: "__COMMIT_SHA__/task_${CLOUD_RUN_TASK_INDEX}"
             resources:
               limits:
-                cpu: "8"
+                cpu: 8000m
                 memory: 32Gi
