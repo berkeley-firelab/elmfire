@@ -1,16 +1,19 @@
-# infra/job.yaml (TEMPLATE — rendered by cloudbuild.yaml)
 apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
   name: __JOB_NAME__
 spec:
-  taskCount: __TASK_COUNT__
-  parallelism: __PARALLELISM__
+  # In v1, concurrency knobs live under spec.template (NOT spec)
   template:
+    # ExecutionTemplateSpec
+    taskCount: __TASK_COUNT__          # integer
+    parallelism: __PARALLELISM__       # integer, <= taskCount
+    maxRetries: 1                      # retry budget per task (v1 field name)
+
     template:
+      # TaskTemplateSpec (the "pod" shape for each task)
       spec:
         serviceAccountName: __JOB_SA__
-        taskRetryCount: 2
         containers:
         - name: runner
           image: __REGION__-docker.pkg.dev/__PROJECT_ID__/__REPO__/__IMAGE__:__COMMIT_SHA__
@@ -20,8 +23,6 @@ spec:
             value: __RESULTS_BUCKET__
           - name: COMMIT_SHA
             value: __COMMIT_SHA__
-          # Explicitly pass shard count so the script doesn't depend on
-          # implicit envs (some Cloud Run envs vary across products).
           - name: CLOUD_RUN_TASK_COUNT
             value: "__TASK_COUNT__"
           resources:
@@ -30,4 +31,3 @@ spec:
               memory: "32Gi"
         restartPolicy: Never
         timeoutSeconds: 86400
-
