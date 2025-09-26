@@ -8,7 +8,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
       build-essential gfortran openmpi-bin libopenmpi-dev \
       bc csvkit jq nano pigz sudo wget locales \
       gdal-bin libgdal-dev proj-bin libproj-dev \
-      python3-minimal python3-pip \
+      python3 python3-pip \
     && locale-gen en_US.UTF-8
 
 # Minimal Python bits some tools/scripts expect
@@ -51,7 +51,7 @@ COPY --from=builder /elmfire /elmfire
 # ---- Python deps for VnV (excluding geospatial already provided via APT) ----
 WORKDIR /elmfire/elmfire/vnv_suite
 RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r requirements.txt \
+    python3 -m pip install --no-cache-dir -r requirements.txt  && \
     python3 -m pip install --no-cache-dir google-cloud-storage crcmod
 
 # ---- Environment ----
