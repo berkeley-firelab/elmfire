@@ -2,29 +2,30 @@ apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
   name: __JOB_NAME__
+  annotations:
 spec:
-  # These fields must be directly under 'spec'
-  taskCount: __TASK_COUNT__
-  parallelism: __PARALLELISM__
-  maxRetries: 1
-  
-  template: # This 'template' is correct and directly contains the task definition
-    # The contents of 'spec' for the task template go directly here
-    serviceAccountName: __JOB_SA__
-    containers:
-    - name: runner
-      image: __REGION__-docker.pkg.dev/__PROJECT_ID__/__REPO__/__IMAGE__:__COMMIT_SHA__
-      command: ["python3", "tools/run_all.py"]
-      env:
-      - name: RESULTS_BUCKET
-        value: __RESULTS_BUCKET__
-      - name: COMMIT_SHA
-        value: __COMMIT_SHA__
-      - name: CLOUD_RUN_TASK_COUNT
-        value: "__TASK_COUNT__"
-      resources:
-        limits:
-          cpu: "8000m"
-          memory: "32Gi"
-    restartPolicy: Never
-    timeoutSeconds: 86400
+  template:
+    spec:
+      parallelism: __PARALLELISM__
+      template:
+        spec:
+          serviceAccountName: __JOB_SA__
+          maxRetries: 0 
+          timeoutSeconds: 3600 
+          containers:
+          - image: __REGION__-docker.pkg.dev/__PROJECT_ID__/__REPO__/__IMAGE__:__COMMIT_SHA__
+            command:
+            - python3
+            args:
+            - tools/run_all.py
+            env:
+            - name: RESULTS_BUCKET
+              value: __RESULTS_BUCKET__
+            - name: COMMIT_SHA
+              value: __COMMIT_SHA__
+            - name: CLOUD_RUN_TASK_COUNT
+              value: __TASK_COUNT__
+            resources:
+              limits:
+                cpu: "8"
+                memory: 32Gi
