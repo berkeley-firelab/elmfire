@@ -5,9 +5,11 @@ substitutions:
   _IMAGE: elmfire-vnv                     # Image name
   _JOB_NAME: elmfire-vnv                  # Cloud Run Job name
   _RESULTS_BUCKET: gs://elmfire_vnv_reports
-  _JOB_SA: 535731099861-compute@developer.gserviceaccount.com
+  _JOB_SA: elmfire-vnv-job@${PROJECT_ID}.iam.gserviceaccount.com
   _TASK_COUNT: '1'                        # number of parallel tasks
   _PARALLELISM: '1'                       # <= _TASK_COUNT is typical
+
+logsBucket: gs://elmfire_vnv_reports
 
 options:
   machineType: 'E2_HIGHCPU_8'
