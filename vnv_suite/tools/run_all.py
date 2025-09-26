@@ -3,23 +3,29 @@ import argparse
 import os
 import subprocess
 import sys
+from math import floor
 
 def usage():
-    return """Usage: run_all_cases.py [OPTIONS]
+    return """Usage: run_all.py [OPTIONS]
 
-Run every case's run_case.sh sequentially (excluding the template).
+Run all discovered cases' run_case.sh, with optional sharding for Cloud Run Jobs.
 
 Options:
-  -l, --list        List the resolved case scripts and exit
-  -n, --dry-run     Show the commands without executing them
-  -s, --slurm       Submit jobs via Slurm (sbatch run_case_slurm.sh)
-  -h, --help        Show this help message
+  -l, --list              List the resolved case scripts for THIS SHARD and exit
+  -n, --dry-run           Show the commands without executing them
+  -s, --slurm             Submit jobs via Slurm (sbatch run_case_slurm.sh)
+  --shard-index N         Zero-based shard index for this worker (overrides env)
+  --shard-count K         Total number of shards/workers (overrides env)
+  -h, --help              Show this help message
 
 Notes:
-  - Each case is executed from its own case directory so ELMFIRE
-    sees inputs in the current working directory (as required).
-  - With --slurm, a run_case_slurm.sh wrapper is generated per case
-    using tools/slurm.sbatch as the universal header.
+  - Sharding sources (highest priority first):
+      1) --shard-index / --shard-count
+      2) CLOUD_RUN_TASK_INDEX / CLOUD_RUN_TASK_COUNT
+      3) TASK_COUNT (custom) with index=0
+      4) default: index=0, count=1
+  - Each case executes from its own directory so ELMFIRE sees inputs in CWD.
+  - With --slurm, a run_case_slurm.sh wrapper is generated per case.
 """
 
 def discover_cases(cases_dir):
@@ -34,7 +40,7 @@ def discover_cases(cases_dir):
     return scripts
 
 def format_case(script, root_dir):
-    """Pretty relative path like cases/wue_transient_heatflux"""
+    """Pretty relative path like cases/Validation/tubbs_fire"""
     rel = os.path.relpath(script, root_dir)
     return rel.removesuffix("/run_case.sh")
 
@@ -60,11 +66,60 @@ def make_slurm_wrapper(case_dir, header_path):
     os.chmod(wrapper, 0o755)
     return wrapper
 
+def resolve_shard_args(cli_index, cli_count):
+    """
+    Determine (shard_index, shard_count) using CLI > env > defaults.
+    Recognized envs:
+      - CLOUD_RUN_TASK_INDEX (0-based), CLOUD_RUN_TASK_COUNT
+      - TASK_COUNT (fallback; index assumed 0)
+    """
+    # CLI wins
+    if cli_index is not None and cli_count is not None:
+        return cli_index, cli_count
+    if (cli_index is None) ^ (cli_count is None):
+        print("[ERROR] --shard-index and --shard-count must be provided together", file=sys.stderr)
+        sys.exit(2)
+
+    # Cloud Run Jobs envs
+    env_idx = os.getenv("CLOUD_RUN_TASK_INDEX")
+    env_cnt = os.getenv("CLOUD_RUN_TASK_COUNT")
+    if env_idx is not None and env_cnt is not None:
+        try:
+            idx = int(env_idx)
+            cnt = int(env_cnt)
+            return idx, cnt
+        except ValueError:
+            print("[WARN] Invalid CLOUD_RUN_TASK_* values; falling back", file=sys.stderr)
+
+    # Fallback custom
+    env_cnt2 = os.getenv("TASK_COUNT")
+    if env_cnt2 is not None:
+        try:
+            cnt = int(env_cnt2)
+            return 0, cnt
+        except ValueError:
+            print("[WARN] Invalid TASK_COUNT; falling back", file=sys.stderr)
+
+    # Default: single shard
+    return 0, 1
+
+def shard_slice(n_items, k_shards, i_index):
+    """Contiguous sharding: [floor(i*n/k), floor((i+1)*n/k))"""
+    if k_shards <= 0:
+        return 0, n_items
+    if i_index < 0 or i_index >= k_shards:
+        return 0, 0
+    start = floor(i_index * n_items / k_shards)
+    end = floor((i_index + 1) * n_items / k_shards)
+    return start, end
+
 def main():
     parser = argparse.ArgumentParser(add_help=False, usage=usage())
     parser.add_argument("-l", "--list", action="store_true")
     parser.add_argument("-n", "--dry-run", action="store_true")
     parser.add_argument("-s", "--slurm", action="store_true")
+    parser.add_argument("--shard-index", type=int, default=None)
+    parser.add_argument("--shard-count", type=int, default=None)
     parser.add_argument("-h", "--help", action="store_true")
     args, extra = parser.parse_known_args()
 
@@ -77,49 +132,72 @@ def main():
         print(usage(), file=sys.stderr)
         sys.exit(2)
 
+    # Basic paths
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     cases_dir = os.path.join(root_dir, "cases")
     header_path = os.path.join(root_dir, "common", "slurm_head.txt")
+
+    # Log context for Cloud Run logs
+    commit_sha = os.getenv("COMMIT_SHA", "")
+    results_bucket = os.getenv("RESULTS_BUCKET", "")
+    if commit_sha:
+        print(f"[INFO] COMMIT_SHA={commit_sha}")
+    if results_bucket:
+        print(f"[INFO] RESULTS_BUCKET={results_bucket}")
 
     if not os.path.isdir(cases_dir):
         print(f"[ERROR] Cases directory not found: {cases_dir}", file=sys.stderr)
         sys.exit(1)
 
-    case_scripts = discover_cases(cases_dir)
-    total = len(case_scripts)
+    all_scripts = discover_cases(cases_dir)
+    total_all = len(all_scripts)
 
-    if total == 0:
+    if total_all == 0:
         print(f"[WARN] No case scripts were discovered under {cases_dir}", file=sys.stderr)
         sys.exit(0)
 
+    # Shard resolution
+    shard_idx, shard_cnt = resolve_shard_args(args.shard_index, args.shard_count)
+    s, e = shard_slice(total_all, shard_cnt, shard_idx)
+    shard_scripts = all_scripts[s:e]
+    total_shard = len(shard_scripts)
+
+    print(f"[INFO] Sharding: total_cases={total_all}, shard_index={shard_idx}, shard_count={shard_cnt}, "
+          f"assigned_range=[{s}:{e}) => shard_cases={total_shard}")
+
+    if total_shard == 0:
+        print("[OK] This shard has no assigned cases. Exiting.")
+        sys.exit(0)
+
+    # Listing / dry-run only shows THIS SHARD's plan
     if args.list:
-        print(f"Discovered {total} case(s):")
-        for script in case_scripts:
+        print(f"Discovered {total_shard} case(s) in this shard:")
+        for script in shard_scripts:
             print(f"  - {format_case(script, root_dir)}")
         sys.exit(0)
 
     if args.dry_run:
         mode = "Slurm submission" if args.slurm else "local execution"
-        print(f"[DRY-RUN] {total} case(s) would be run with {mode}:")
-        for script in case_scripts:
+        print(f"[DRY-RUN] {total_shard} case(s) would be run with {mode}:")
+        for script in shard_scripts:
             rel = format_case(script, root_dir)
             case_dir = os.path.dirname(script)
             if args.slurm:
                 print(f"  - {rel} (cd {case_dir} && sbatch run_case_slurm.sh)")
             else:
-                print(f"  - {rel} (cd {case_dir} && ./run_case.sh)")
+                print(f"  - {rel} (cd {case_dir} && bash ./run_case.sh)")
         sys.exit(0)
 
     # Actual execution
     if args.slurm:
-        print(f"[INFO] Preparing & submitting {total} case(s) via Slurm ...")
+        print(f"[INFO] Preparing & submitting {total_shard} case(s) via Slurm ...")
     else:
-        print(f"[INFO] Running {total} case(s) sequentially ...")
+        print(f"[INFO] Running {total_shard} case(s) sequentially in this shard ...")
 
-    for idx, script in enumerate(case_scripts, start=1):
+    for idx, script in enumerate(shard_scripts, start=1):
         rel = format_case(script, root_dir)
         case_dir = os.path.dirname(script)
-        print(f"\n[INFO] [{idx}/{total}] {rel}")
+        print(f"\n[INFO] [{idx}/{total_shard}] {rel}")
 
         if not os.path.isdir(case_dir):
             print(f"[ERROR] Cannot cd into {case_dir}", file=sys.stderr)
@@ -135,6 +213,7 @@ def main():
                 sys.exit(e.returncode)
         else:
             try:
+                # Prefer bash explicitly to avoid executable bit issues
                 subprocess.run(["bash", "./run_case.sh"], cwd=case_dir, check=True)
                 print(f"[OK] Completed {rel}")
             except subprocess.CalledProcessError as e:
@@ -142,9 +221,9 @@ def main():
                 sys.exit(e.returncode)
 
     if args.slurm:
-        print(f"\n[OK] Submitted {total} job(s).")
+        print(f"\n[OK] Submitted {total_shard} job(s) from this shard.")
     else:
-        print(f"\n[OK] All {total} case(s) completed simulation successfully.")
+        print(f"\n[OK] All {total_shard} case(s) in this shard completed successfully.")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,33 @@
+# infra/job.yaml (TEMPLATE — rendered by cloudbuild.yaml)
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: __JOB_NAME__
+spec:
+  taskCount: __TASK_COUNT__
+  parallelism: __PARALLELISM__
+  template:
+    template:
+      spec:
+        serviceAccountName: __JOB_SA__
+        taskRetryCount: 2
+        containers:
+        - name: runner
+          image: __REGION__-docker.pkg.dev/__PROJECT_ID__/__REPO__/__IMAGE__:__COMMIT_SHA__
+          command: ["python3", "/app/tools/run_all.py"]
+          env:
+          - name: RESULTS_BUCKET
+            value: __RESULTS_BUCKET__
+          - name: COMMIT_SHA
+            value: __COMMIT_SHA__
+          # Explicitly pass shard count so the script doesn't depend on
+          # implicit envs (some Cloud Run envs vary across products).
+          - name: CLOUD_RUN_TASK_COUNT
+            value: "__TASK_COUNT__"
+          resources:
+            limits:
+              cpu: "8000m"
+              memory: "32Gi"
+        restartPolicy: Never
+        timeoutSeconds: 86400
+
