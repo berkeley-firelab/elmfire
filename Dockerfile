@@ -38,7 +38,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
       openmpi-bin \
       # GDAL/PROJ runtime + Python geospatial stack from APT
       gdal-bin libgdal-dev proj-bin libproj-dev \
-      python3-minimal python3-pip \
+      python3 python3-pip \
       python3-rasterio python3-fiona python3-shapely python3-geopandas \
       # quality-of-life + tools used by suite/scripts
       bc csvkit jq nano pigz sudo wget make locales \
