@@ -6,8 +6,8 @@ substitutions:
   _JOB_NAME: elmfire-vnv                  # Cloud Run Job name
   _RESULTS_BUCKET: gs://elmfire_vnv_reports
   _JOB_SA: elmfire-vnv-job@${PROJECT_ID}.iam.gserviceaccount.com
-  _TASK_COUNT: 2                        # number of parallel tasks
-  _PARALLELISM: 2                       # <= _TASK_COUNT is typical
+  _TASK_COUNT: "2"                        # number of parallel tasks
+  _PARALLELISM: "2"                       # <= _TASK_COUNT is typical
 
 logsBucket: gs://elmfire_vnv_reports
 
