@@ -64,7 +64,7 @@ steps:
     - |
       set -euo pipefail
       JOB_ID="elmfire-vnv-${COMMIT_SHA}"
-      gcloud batch jobs submit "$JOB_ID" \
+      gcloud batch jobs submit "$${JOB_ID}" \
         --location="${_REGION}" \
         --config="/workspace/batch_resolved.json"
       echo "[INFO] Submitted Batch job: $JOB_ID"
