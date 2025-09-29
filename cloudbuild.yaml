@@ -3,7 +3,7 @@ substitutions:
   _REGION: us-central1
   _REPO: elmfire-vnv-suite                # Artifact Registry repository name (already created)
   _IMAGE: elmfire-vnv                     # Image name
-  _JOB_NAME: elmfire-vnv                  # Cloud Run Job name
+  _JOB_NAME: elmfire-vnv                  # Cloud Job name
   _RESULTS_BUCKET: gs://elmfire_vnv_reports
   _JOB_SA: 535731099861-compute@developer.gserviceaccount.com
   _TASK_COUNT: "2"                        # number of parallel tasks
@@ -63,11 +63,11 @@ steps:
     - -lc
     - |
       set -euo pipefail
-      gcloud batch jobs submit "elmfire-vnv-${COMMIT_SHA}" \
+      gcloud batch jobs submit "${_JOB_NAME}" \
         --location="${_REGION}" \
         --config="/workspace/batch_resolved.json"
-      echo "[INFO] Submitted Batch job: $JOB_ID"
-      echo "Logs: https://console.cloud.google.com/batch/jobs/details/${_REGION}/$JOB_ID?project=${PROJECT_ID}"
+      echo "[INFO] Submitted Batch job: ${_JOB_NAME}"
+      echo "Logs: https://console.cloud.google.com/batch/jobs/details/${_REGION}/${_JOB_NAME}?project=${PROJECT_ID}"
 
 # ============== Set-ups for cloud run job executions =================
 # 3) Render job.yaml -> /workspace/job_resolved.yaml
