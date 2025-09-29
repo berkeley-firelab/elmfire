@@ -65,9 +65,9 @@ steps:
     - -lc
     - |
       set -euo pipefail
-      gcloud batch jobs submit "$(echo ${COMMIT_SHA} | cut -c1-20)" \
-        --location="${_REGION}" \
-        --config="/workspace/batch_resolved.json"
+      gcloud batch jobs submit "elmfire-vnv-$(git rev-parse --short HEAD)" \
+        --location="us-central1" \
+        --config="infra/batch_resolved.json"
       echo "[INFO] Submitted Batch job: $(echo ${COMMIT_SHA} | cut -c1-20)"
       echo "Logs: https://console.cloud.google.com/batch/jobs/details/${_REGION}/$(echo ${COMMIT_SHA} | cut -c1-20)?project=${PROJECT_ID}"
 
