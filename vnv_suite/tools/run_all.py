@@ -291,23 +291,23 @@ def main():
         try:
             # 1) Upload each case directory to a matching path in GCS:
             #    gs://<bucket>/<results_prefix>/<relative path under cases/>
-            uploaded_cases = 0
-            for script in shard_scripts:
-                case_dir = os.path.dirname(script)
-                # relative path like: Validation/landscape_scale/tubbs_fire
-                rel_case = os.path.relpath(case_dir, cases_dir).replace(os.sep, "/")
-                dest_prefix = "/".join([p for p in [results_prefix, rel_case] if p])
+            # uploaded_cases = 0
+            # for script in shard_scripts:
+            #     case_dir = os.path.dirname(script)
+            #     # relative path like: Validation/landscape_scale/tubbs_fire
+            #     rel_case = os.path.relpath(case_dir, cases_dir).replace(os.sep, "/")
+            #     dest_prefix = "/".join([p for p in [results_prefix, rel_case] if p])
 
-                print(f"[INFO] Uploading case '{rel_case}' from {case_dir} -> {results_bucket}/{dest_prefix}")
-                upload_tree_to_gcs(case_dir, results_bucket, dest_prefix)
-                uploaded_cases += 1
+            #     print(f"[INFO] Uploading case '{rel_case}' from {case_dir} -> {results_bucket}/{dest_prefix}")
+            #     upload_tree_to_gcs(case_dir, results_bucket, dest_prefix)
+            #     uploaded_cases += 1
 
-            print(f"[OK] Uploaded {uploaded_cases} case folder(s) to {results_bucket}/{results_prefix}")
+            # print(f"[OK] Uploaded {uploaded_cases} case folder(s) to {results_bucket}/{results_prefix}")
 
             # 2) Also upload suite-level artifacts if you want:
             #    Uncomment if you still want a full VnV suite snapshot at the shard root
-            print(f"[INFO] Uploading suite snapshot {dump_dir} -> {results_bucket}/{results_prefix}/_suite")
-            upload_tree_to_gcs(dump_dir, results_bucket, f"{results_prefix}/_suite")
+            print(f"[INFO] Uploading suite snapshot {dump_dir} -> {results_bucket}/{results_prefix}/vnv_suite")
+            upload_tree_to_gcs(dump_dir, results_bucket, f"{results_prefix}/vnv_suite")
 
         except Exception as e:
             # Do not hide job success just because upload failed; surface clearly.

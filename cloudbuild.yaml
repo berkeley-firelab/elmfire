@@ -43,17 +43,20 @@ steps:
     - -lc
     - |
       set -euo pipefail
+      COMMIT_SHORT=$(echo ${COMMIT_SHA} | cut -c1-7)
       sed \
         -e "s|__REGION__|${_REGION}|g" \
         -e "s|__PROJECT_ID__|${PROJECT_ID}|g" \
         -e "s|__REPO__|${_REPO}|g" \
         -e "s|__IMAGE__|${_IMAGE}|g" \
         -e "s|__COMMIT_SHA__|${COMMIT_SHA}|g" \
+        -e "s|__COMMIT_SHORT__|${COMMIT_SHORT}|g" \
+        -e "s|__JOB_NAME__|${_JOB_NAME}|g" \
         -e "s|__RESULTS_BUCKET__|${_RESULTS_BUCKET}|g" \
         -e "s|__JOB_SA__|${_JOB_SA}|g" \
-        -e "s|__TASK_COUNT__|${_TASK_COUNT}|g" \
-        -e "s|__PARALLELISM__|${_PARALLELISM}|g" \
-        infra/batch_job.json > /workspace/batch_resolved.json
+        -e "s|__TASK_COUNT__|\"${_TASK_COUNT}\"|g" \
+        -e "s|__PARALLELISM__|\"${_PARALLELISM}\"|g" \
+        infra/job.yaml > /workspace/job_resolved.yaml
       head -n 60 /workspace/batch_resolved.json
 
 # 3) Submit to Google Batch (async)
