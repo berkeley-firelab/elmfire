@@ -55,7 +55,7 @@ steps:
         -e "s|__JOB_SA__|${_JOB_SA}|g" \
         -e "s|__TASK_COUNT__|\"${_TASK_COUNT}\"|g" \
         -e "s|__PARALLELISM__|\"${_PARALLELISM}\"|g" \
-        infra/job.yaml > /workspace/job_resolved.yaml
+        infra/batch_job.json > /workspace/batch_resolved.json
       head -n 60 /workspace/batch_resolved.json
 
 # 3) Submit to Google Batch (async)
