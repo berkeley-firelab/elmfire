@@ -93,6 +93,17 @@ def resolve_shard_args(cli_index, cli_count):
         except ValueError:
             print("[WARN] Invalid CLOUD_RUN_TASK_* values; falling back", file=sys.stderr)
 
+    # Google Batch
+    b_idx = os.getenv("BATCH_TASK_INDEX")
+    b_cnt = os.getenv("BATCH_TASK_COUNT")  # not always set; fall back to TASK_COUNT
+    if b_idx is not None:
+        try:
+            idx = int(b_idx)
+            cnt = int(b_cnt) if b_cnt is not None else int(os.getenv("TASK_COUNT", "1"))
+            return idx, cnt
+        except ValueError:
+            print("[WARN] Invalid BATCH_TASK_*; falling back", file=sys.stderr)
+
     # Fallback custom
     env_cnt2 = os.getenv("TASK_COUNT")
     if env_cnt2 is not None:
@@ -269,21 +280,39 @@ def main():
     else:
         print(f"\n[OK] All {total_shard} case(s) in this shard completed successfully.")
 
-    # Upload results if configured
+    # Upload results if configured (preserve case folder structure on GCS)
     results_bucket = os.getenv("RESULTS_BUCKET", "").strip()
-    dump_dir = os.getenv("DUMP_DIR", "/elmfire/elmfire/vnv_suite").strip()
+    dump_dir = os.getenv("DUMP_DIR", "/elmfire/elmfire/vnv_suite").strip()  # still available if you want a full suite dump
     results_prefix = os.getenv("RESULTS_PREFIX", "").strip()
     task_idx = os.getenv("CLOUD_RUN_TASK_INDEX", "")
     if results_bucket:
-        # Expand ${CLOUD_RUN_TASK_INDEX} in RESULTS_PREFIX if present
-        results_prefix = results_prefix.replace("${CLOUD_RUN_TASK_INDEX}", task_idx)
+        results_prefix = results_prefix.strip("/")
+
         try:
-            print(f"[INFO] Uploading {dump_dir} to {results_bucket}/{results_prefix} ...")
-            upload_tree_to_gcs(dump_dir, results_bucket, results_prefix)
+            # 1) Upload each case directory to a matching path in GCS:
+            #    gs://<bucket>/<results_prefix>/<relative path under cases/>
+            uploaded_cases = 0
+            for script in shard_scripts:
+                case_dir = os.path.dirname(script)
+                # relative path like: Validation/landscape_scale/tubbs_fire
+                rel_case = os.path.relpath(case_dir, cases_dir).replace(os.sep, "/")
+                dest_prefix = "/".join([p for p in [results_prefix, rel_case] if p])
+
+                print(f"[INFO] Uploading case '{rel_case}' from {case_dir} -> {results_bucket}/{dest_prefix}")
+                upload_tree_to_gcs(case_dir, results_bucket, dest_prefix)
+                uploaded_cases += 1
+
+            print(f"[OK] Uploaded {uploaded_cases} case folder(s) to {results_bucket}/{results_prefix}")
+
+            # 2) Also upload suite-level artifacts if you want:
+            #    Uncomment if you still want a full VnV suite snapshot at the shard root
+            print(f"[INFO] Uploading suite snapshot {dump_dir} -> {results_bucket}/{results_prefix}/_suite")
+            upload_tree_to_gcs(dump_dir, results_bucket, f"{results_prefix}/_suite")
+
         except Exception as e:
             # Do not hide job success just because upload failed; surface clearly.
             print(f"[ERROR] Upload to GCS failed: {e}", file=sys.stderr)
-            # choose: either exit nonzero to fail the job, or keep success.
+            # If you prefer to fail the job on upload issues, uncomment:
             # sys.exit(2)
 
 if __name__ == "__main__":
