@@ -43,13 +43,12 @@ steps:
     - -lc
     - |
       set -euo pipefail
-      COMMIT_SHORT=$(echo ${COMMIT_SHA} | cut -c1-7)
       sed \
         -e "s|__REGION__|${_REGION}|g" \
         -e "s|__PROJECT_ID__|${PROJECT_ID}|g" \
         -e "s|__REPO__|${_REPO}|g" \
         -e "s|__IMAGE__|${_IMAGE}|g" \
-        -e "s|__COMMIT_SHA__|${COMMIT_SHA}|g" \
+        -e "s|__COMMIT_SHA__|$(echo ${COMMIT_SHA} | cut -c1-20)|g" \
         -e "s|__COMMIT_SHORT__|${COMMIT_SHORT}|g" \
         -e "s|__JOB_NAME__|${_JOB_NAME}|g" \
         -e "s|__RESULTS_BUCKET__|${_RESULTS_BUCKET}|g" \
