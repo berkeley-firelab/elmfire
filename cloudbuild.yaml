@@ -8,7 +8,7 @@ substitutions:
   _JOB_SA: 535731099861-compute@developer.gserviceaccount.com
   _TASK_COUNT: "2"                        # number of parallel tasks
   _PARALLELISM: "2"                       # <= _TASK_COUNT is typical
-  _BATCH_JOB_ID: "elmfire-vnv-__COMMIT_SHA__"   # Batch job name
+  _BATCH_JOB_ID: "elmfire-vnv-${COMMIT_SHA}"   # Batch job name
 
 logsBucket: gs://elmfire_vnv_reports
 
