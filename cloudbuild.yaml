@@ -65,11 +65,11 @@ steps:
     - -lc
     - |
       set -euo pipefail
-      gcloud batch jobs submit "${_JOB_NAME}" \
+      gcloud batch jobs submit "$(echo ${COMMIT_SHA} | cut -c1-20)" \
         --location="${_REGION}" \
         --config="/workspace/batch_resolved.json"
-      echo "[INFO] Submitted Batch job: ${_JOB_NAME}"
-      echo "Logs: https://console.cloud.google.com/batch/jobs/details/${_REGION}/${_JOB_NAME}?project=${PROJECT_ID}"
+      echo "[INFO] Submitted Batch job: $(echo ${COMMIT_SHA} | cut -c1-20)"
+      echo "Logs: https://console.cloud.google.com/batch/jobs/details/${_REGION}/$(echo ${COMMIT_SHA} | cut -c1-20)?project=${PROJECT_ID}"
 
 # ============== Set-ups for cloud run job executions =================
 # 3) Render job.yaml -> /workspace/job_resolved.yaml
