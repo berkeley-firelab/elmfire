@@ -28,7 +28,7 @@ INTEGER, INTENT(OUT) :: NTIMESTEPS
 INTEGER :: I, ILOC, J, IX, IY, ITIMESTEP, IX_IGN, IY_IGN, ISTEP, K, LU, IT1, IT2, &
            ITSTART, ITNOW, IDUMPCOUNT, ICOUNT, IXSTART, IYSTART, IXSTOP, IYSTOP, IX2, IY2, &
            ITLO_METEOROLOGY, ITHI_METEOROLOGY, BINARY_OUTPUTS_SIZE, IT_EA, IXCEN, IYCEN, IOS, IPYROME, &
-           N_TO_TAG, N_SPOT_FIRES, ILH, IT2_LSP, IFBFM, IBLDGFM, ICOL, IROW
+           N_TO_TAG, N_SPOT_FIRES, IT2_LSP, ICOL, IROW
 
 INTEGER, SAVE :: NX, NY, NDUMPS
 INTEGER, POINTER, SAVE, DIMENSION(:) :: IX_TO_TAG, IY_TO_TAG, IX_SPOT_FIRE, IY_SPOT_FIRE
@@ -38,8 +38,7 @@ REAL :: T_LAST_EXTENDED_ATTACK, T_LAST_INTERPOLATE_M1, T_LAST_INTERPOLATE_M10, T
         T_LAST_WIND_FLUCTUATIONS, T, DT, SURFACE_ACCELERATION_FACTOR, &
         F_METEOROLOGY, R0, TAU, ACRES, ACRES_SDI, ELAPSED_TIME, E, FLIN_MAX, HECTARES, POC, SIMULATION_TSTOP_HOURS, &
         BURN_PERIOD_CENTER_HOUR, BURN_PERIOD_START_HOUR, BURN_PERIOD_STOP_HOUR, HOUR_OF_DAY, DT_DAY, TBURN, &
-        T_LAST_SMOKE_OUTPUT, QDOTNOW, XCEN, YCEN, THI, TLO, MDOTNOW, RADIUS, WN_FUEL, RUNTIME, P_IGNITION, & 
-        HARDENING_FACTOR_LOCAL,  HRRPUA_CRIT_LOCAL, HRRPUA_PEAK_LOCAL, T_EARLY_LOCAL, T_DECAY_LOCAL, T_FULLDEV_LOCAL
+        T_LAST_SMOKE_OUTPUT, QDOTNOW, XCEN, YCEN, THI, TLO, MDOTNOW, RADIUS, RUNTIME
 
 REAL, SAVE :: ACRES_PER_PIXEL, DUMPTIMES(0:1000), RCELLSIZE, HALFRCELLSIZE, TSTOP, WS20
 REAL, ALLOCATABLE, SAVE, DIMENSION(:) :: X,Y
@@ -60,7 +59,7 @@ CHARACTER(400) :: FN
 
 TYPE(NODE), POINTER :: C => NULL(), DUMMY_NODE => NULL(), L_WUI_P => NULL()
 
-TYPE (FUEL_MODEL_TABLE_TYPE) :: FMT
+! TYPE (FUEL_MODEL_TABLE_TYPE) :: FMT
 
 CALL SYSTEM_CLOCK(ITSTART)
 IT1=ITSTART
@@ -176,8 +175,11 @@ IF (FIRSTCALL) THEN
    A_TIMES_BURNED => ANALYSIS_TIMES_BURNED%R4 (:,:,:)
    SURFACE_FIRE   => ANALYSIS_SURFACE_FIRE%I2(:,:,1); SURFACE_FIRE(:,:) = 0.
 
-   IF (DUMP_EMBER_FLUX) EMBER_FLUX%R4(:,:,:) = 0
-   IF (ENABLE_SPOTTING .AND. USE_UMD_SPOTTING_MODEL .AND. USE_EULERIAN_SPOTTING) EMBER_FLUX%R4(:,:,:) = 0
+   IF (DUMP_EMBER_FLUX) EMBER_FLUX_TRANSIENT%R4(:,:,1) = 0
+   IF (ENABLE_SPOTTING .AND. USE_UMD_SPOTTING_MODEL .AND. USE_EULERIAN_SPOTTING) THEN
+      EMBER_FLUX_TRANSIENT%R4(:,:,1) = 0
+      EMBER_FLUX%R4(:,:,1) = 0
+   ENDIF
 
    WRITE(FOUR_IRANK_WORLD, '(I4.4)') IRANK_WORLD
    IF (NUM_TIME_AT_BURNED_ACRES .GT. 0) ALLOCATE(ALREADY_REACHED_BURNED_ACRES(1:NUM_TIME_AT_BURNED_ACRES))
@@ -341,7 +343,7 @@ CALL ACCUMULATE_CPU_USAGE(33, IT1, IT2)
 
 IF (.NOT. RANDOM_IGNITIONS) PHIP(:,:) = PHI0%R4(:,:,1)
 
-IF (DUMP_EMBER_FLUX .AND. (.NOT. ACCUMULATE_EMBER_FLUX) ) EMBER_FLUX%R4(:,:,:) = 0
+IF (DUMP_EMBER_FLUX .AND. (.NOT. ACCUMULATE_EMBER_FLUX) ) EMBER_FLUX%R4(:,:,1) = 0
 
 ! Tag bands where initial phi values are less than 0:
 IF (.NOT. RANDOM_IGNITIONS) THEN
@@ -413,9 +415,9 @@ IF (.NOT. RANDOM_IGNITIONS) THEN
          ENDIF
 #endif
 
-#ifdef _UMDSPOTTING
-         IF (USE_UMD_SPOTTING_MODEL) LIST_BURNED%TAIL%TAU_EMBERGEN = 0.
-#endif
+! #ifdef _UMDSPOTTING
+!          IF (USE_UMD_SPOTTING_MODEL) LIST_BURNED%TAIL%TAU_EMBERGEN = 0.
+! #endif
 
 #ifdef _SUPPRESSION
          IF (ENABLE_EXTENDED_ATTACK .AND. USE_SDI) C%SDI = SDI_FACTOR * SDI%R4(ICOL,IROW,1)
@@ -950,9 +952,9 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
          CALL ACCUMULATE_CPU_USAGE(47, IT1, IT2)
 #endif
 
-#ifdef _UMDSPOTTING
-         LIST_BURNED%TAIL%TAU_EMBERGEN = 0.
-#endif
+! #ifdef _UMDSPOTTING
+!          LIST_BURNED%TAIL%TAU_EMBERGEN = 0.
+! #endif
 
 #ifdef _SMOKE
          IF (ENABLE_SMOKE_OUTPUTS) THEN
@@ -981,36 +983,26 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
          IX_TO_TAG(N_TO_TAG) = IX
          IY_TO_TAG(N_TO_TAG) = IY
 
-         IF (ENABLE_SPOTTING) THEN
+         IF (ENABLE_SPOTTING .AND. USE_SUPERSEDED_SPOTTING .AND. (.NOT. USE_UMD_SPOTTING_MODEL)) THEN
             CALL_SPOTTING = .FALSE.
-            IF (.NOT. USE_UMD_SPOTTING_MODEL) THEN
-               IF (C%FLIN_SURFACE .GE. C%CRITICAL_FLIN) THEN
-                  CALL RANDOM_NUMBER(R0)
-                  IF (R0 .LT. 0.01*CROWN_FIRE_SPOTTING_PERCENT) CALL_SPOTTING = .TRUE.
-               ENDIF
 
-               IF (ENABLE_SURFACE_FIRE_SPOTTING .AND. (.NOT. CALL_SPOTTING) ) THEN
-                  IF (C%FLIN_SURFACE .GE. CRITICAL_SPOTTING_FIRELINE_INTENSITY(FBFM%I2(C%IX,C%IY,1))) THEN
-                     CALL RANDOM_NUMBER(R0)
-                     IF (R0 .LT. 0.01*SURFACE_FIRE_SPOTTING_PERCENT(FBFM%I2(C%IX,C%IY,1))) CALL_SPOTTING = .TRUE.
-                     CONTINUE
-                  ENDIF
+            IF (C%FLIN_SURFACE .GE. C%CRITICAL_FLIN) THEN
+               CALL RANDOM_NUMBER(R0)
+               IF (R0 .LT. 0.01*CROWN_FIRE_SPOTTING_PERCENT) CALL_SPOTTING = .TRUE.
+            ENDIF
+
+            IF (ENABLE_SURFACE_FIRE_SPOTTING .AND. (.NOT. CALL_SPOTTING) ) THEN
+               IF (C%FLIN_SURFACE .GE. CRITICAL_SPOTTING_FIRELINE_INTENSITY(FBFM%I2(C%IX,C%IY,1))) THEN
+                  CALL RANDOM_NUMBER(R0)
+                  IF (R0 .LT. 0.01*SURFACE_FIRE_SPOTTING_PERCENT(FBFM%I2(C%IX,C%IY,1))) CALL_SPOTTING = .TRUE.
+                  CONTINUE
                ENDIF
             ENDIF
 
             IF (CALL_SPOTTING) THEN
-               ILH = MAX(MIN(NINT(100.*C%MLH),120),30)
-               FMT = FUEL_MODEL_TABLE_2D(C%IFBFM,ILH)
-               WN_FUEL = FMT%WN_DEAD+FMT%WN_LIVE
-               IF (USE_SUPERSEDED_SPOTTING) THEN
-                  CALL SPOTTING_SUPERSEDED ( IX,IY,C%WS20_NOW,C%FLIN_SURFACE,F_METEOROLOGY,WS20_LO,WS20_HI, WD20_LO, WD20_HI, &
+               CALL SPOTTING_SUPERSEDED ( IX,IY,C%WS20_NOW,C%FLIN_SURFACE,F_METEOROLOGY,WS20_LO,WS20_HI, WD20_LO, WD20_HI, &
                                   N_SPOT_FIRES,IX_SPOT_FIRE,IY_SPOT_FIRE,ICASE,DT, T,0., &
                                   SOURCE_FUEL_IGN_MULT (FBFM%I2(C%IX,C%IY,1)) )
-               ELSE
-                  CALL SPOTTING ( IX,IY,C%WS20_NOW,C%FLIN_SURFACE, N_SPOT_FIRES,IX_SPOT_FIRE,IY_SPOT_FIRE,&
-                                  ICASE, DT, T, 0., SOURCE_FUEL_IGN_MULT (FBFM%I2(C%IX,C%IY,1)), &
-                                  BLDG_FOOTPRINT_FRAC%R4(C%IX,C%IY,1), C%FMC, C%IFBFM, WN_FUEL) ! Parameters added to calculate number of physical embers
-               ENDIF
             ENDIF
          ENDIF ! ENABLE_SPOTTING
 
@@ -1021,63 +1013,25 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
    ENDDO ! I = 1, LIST_TAGGED%NUM_NODES
 
 #ifdef _UMDSPOTTING
-   IF (ENABLE_SPOTTING .AND. USE_UMD_SPOTTING_MODEL) THEN
-      C => LIST_BURNED%HEAD
+   IF (ENABLE_SPOTTING .AND. USE_UMD_SPOTTING_MODEL .AND. (.NOT. USE_SUPERSEDED_SPOTTING)) THEN
+      C => LIST_TAGGED%HEAD
       DO I = 1, LIST_BURNED%NUM_NODES
          CALL_SPOTTING = .FALSE.
-         IF (USE_PHYSICAL_SPOTTING_DURATION) THEN
-            IF (C%T_START_SPOTTING .LT. 0.0) THEN
-               IF (C%IFBFM .EQ. 91 ) THEN
-                  IF(USE_BLDG_SPREAD_MODEL .AND. (BLDG_SPREAD_MODEL_TYPE .EQ. 2)) THEN
-                     HRRPUA_CRIT_LOCAL = CRITICAL_SPOTTING_FIRELINE_INTENSITY(FBFM%I2(C%IX,C%IY,1))/ANALYSIS_CELLSIZE
-                     IF (C%HRR_TRANSIENT .GE. HRRPUA_CRIT_LOCAL) THEN
-                        ! Assumed fire curve with linear growth and decay phases
-                        HRRPUA_PEAK_LOCAL = BUILDING_FUEL_MODEL_TABLE(C%IBLDGFM)%HRRPUA_PEAK
-                        T_EARLY_LOCAL = BUILDING_FUEL_MODEL_TABLE(C%IBLDGFM)%T_EARLY
-                        T_DECAY_LOCAL = BUILDING_FUEL_MODEL_TABLE(C%IBLDGFM)%T_DECAY
-                        T_FULLDEV_LOCAL = BUILDING_FUEL_MODEL_TABLE(C%IBLDGFM)%T_FULLDEV
-                        C%T_START_SPOTTING = T
-                        C%T_END_SPOTTING = C%T_START_SPOTTING + (HRRPUA_PEAK_LOCAL-HRRPUA_CRIT_LOCAL) * &
-                              (T_EARLY_LOCAL/HRRPUA_PEAK_LOCAL  + (T_DECAY_LOCAL - T_FULLDEV_LOCAL)/HRRPUA_PEAK_LOCAL) + &
-                              T_FULLDEV_LOCAL - T_EARLY_LOCAL
-                     ENDIF
-                  ELSE
-                     C%T_START_SPOTTING = C%TIME_OF_ARRIVAL
-                     C%T_END_SPOTTING = C%T_START_SPOTTING+TAU_EMBERGEN
-                  ENDIF ! IF(USE_BLDG_SPREAD_MODEL)
-               ELSE
-                  C%T_START_SPOTTING = C%TIME_OF_ARRIVAL
-                  C%T_END_SPOTTING = C%T_START_SPOTTING+C%LOCAL_EMBERGEN_DURATION
-               ENDIF ! IF (C%T_START_SPOTTING .LT. 1E-3) THEN
-            ENDIF ! IF (USE_PHYSICAL_SPOTTING_DURATION) THEN
-         ELSE
-            IF (C%T_START_SPOTTING .LT. 0.0) THEN
-               C%T_START_SPOTTING = C%TIME_OF_ARRIVAL
-               C%T_END_SPOTTING = C%T_START_SPOTTING+TAU_EMBERGEN
-            ENDIF
-         ENDIF
+         CALL CALC_SPOTTING_DURATION(C, T)
+         
          IF (T .GE. C%T_START_SPOTTING .AND. T .LE. C%T_END_SPOTTING) THEN
             IF (C%FLIN_SURFACE .GE. CRITICAL_SPOTTING_FIRELINE_INTENSITY(FBFM%I2(C%IX,C%IY,1))) THEN
                CALL RANDOM_NUMBER(R0)
                IF (R0 .LT. 0.01*SURFACE_FIRE_SPOTTING_PERCENT(FBFM%I2(C%IX,C%IY,1))) CALL_SPOTTING = .TRUE. 
                CONTINUE
             ENDIF
-            IF (CALL_SPOTTING) THEN
-               ILH = MAX(MIN(NINT(100.*C%MLH),120),30)
-               FMT = FUEL_MODEL_TABLE_2D(C%IFBFM,ILH)
-               WN_FUEL = FMT%WN_DEAD+FMT%WN_LIVE
-               IF (USE_SUPERSEDED_SPOTTING) THEN
-                  CALL SPOTTING_SUPERSEDED ( IX,IY,C%WS20_NOW,C%FLIN_SURFACE,F_METEOROLOGY,WS20_LO,WS20_HI, WD20_LO, WD20_HI, &
-                                  N_SPOT_FIRES,IX_SPOT_FIRE,IY_SPOT_FIRE,ICASE,DT, T,0., &
-                                  SOURCE_FUEL_IGN_MULT (FBFM%I2(C%IX,C%IY,1)) )
-               ELSE
-                  CALL SPOTTING ( C%IX,C%IY,C%WS20_NOW,C%FLIN_SURFACE,N_SPOT_FIRES,IX_SPOT_FIRE,IY_SPOT_FIRE,&
-                                  ICASE,DT,T, C%TAU_EMBERGEN,SOURCE_FUEL_IGN_MULT (FBFM%I2(C%IX,C%IY,1)),&
-                                  BLDG_FOOTPRINT_FRAC%R4(C%IX,C%IY,1), C%FMC, C%IFBFM, WN_FUEL) ! Parameters added to calculate number of physical embers
-               ENDIF
+            IF (CALL_SPOTTING) THEN ! If using Eulerian firebrand solver, no trajectory calculated at this step, only initiate trackers
+               CALL APPEND(LIST_EMBER_TRACKER, IX, IY, T)
+               CALL SPOTTING(IX,IY,C%WS20_NOW,C%FLIN_SURFACE, N_SPOT_FIRES, IX_SPOT_FIRE, IY_SPOT_FIRE, &
+                             ICASE, DT, T, TAU, SOURCE_FUEL_IGN_MULT (FBFM%I2(C%IX,C%IY,1)),  C%IFBFM, LIST_EMBER_TRACKER)
             ENDIF
          ENDIF
-         C%TAU_EMBERGEN = MIN (TAU_EMBERGEN, C%TAU_EMBERGEN + DT)
+         ! C%TAU_EMBERGEN = MIN (TAU_EMBERGEN, C%TAU_EMBERGEN + DT)
          C => C%NEXT
       ENDDO
    ENDIF
@@ -1090,55 +1044,15 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
    ENDDO
 
    IF (USE_UMD_SPOTTING_MODEL) THEN
+
       IF (USE_EULERIAN_SPOTTING) THEN
-         C => LIST_EMBER_DEPOSITED%HEAD
-         DO I = 1, LIST_EMBER_DEPOSITED%NUM_NODES-1
-            IX = C%IX
-            IY = C%IY
-            CALL EMBER_CONSUMPTION(IX, IY, T, DT)
-
-            IF(PHIP(IX,IY) .GE. 0 .AND. SURFACE_FIRE(IX,IY) .LE. 0) THEN
-               IF (USE_EMBER_IGNITION_MODEL) THEN
-                  ICOL = ICOL_ANALYSIS_F2C(IX)
-                  IROW = IROW_ANALYSIS_F2C(IY)
-                  WS20 = WS20_LO(ICOL,IROW) * (1. - F_METEOROLOGY) + F_METEOROLOGY * WS20_HI(ICOL,IROW)
-                  ! Lines added to utilize the tabulated ignition probability proposed by UCB
-                  IFBFM = FBFM%I2(IX,IY,1)
-                  IF(IFBFM .NE. 91) THEN
-                     P_IGNITION = PIGN
-                     HARDENING_FACTOR_LOCAL = 1.0
-                  ELSE
-                     IF(USE_BLDG_SPREAD_MODEL .AND. (BLDG_SPREAD_MODEL_TYPE .EQ. 2)) THEN
-                        IBLDGFM = BLDG_FUEL_MODEL%I2(IX,IY,1)
-                        P_IGNITION = BUILDING_FUEL_MODEL_TABLE(IBLDGFM)%P_IGNITION
-                        HARDENING_FACTOR_LOCAL = BUILDING_FUEL_MODEL_TABLE(IBLDGFM)%HARDENING_FACTOR
-                     ELSE
-                        P_IGNITION = PIGN
-                        HARDENING_FACTOR_LOCAL = GLOBAL_HARDENING_FACTOR
-                     ENDIF
-                  ENDIF
-
-                  IF (.NOT. EMBER_IGNITION(IX,IY,T, DT, WS20, P_IGNITION, LOCAL_IGNITION_TIME, CELL_IGNITION_DELAY, HARDENING_FACTOR_LOCAL)) THEN
-                     C => C%NEXT
-                     CYCLE
-                  ENDIF
-               ELSE
-                  IF (ABS(EMBER_TIGN(IX,IY) - T-DT) .GE. 0.5*DT .OR. EMBER_TIGN(IX,IY) .LT. 0) THEN
-                     C => C%NEXT
-                     CYCLE
-                  ENDIF
-               ENDIF
-               IF (ADJ%R4(IX,IY,1) .GT. 0. .AND. (.NOT. ISNONBURNABLE(IX,IY) ) ) THEN
-                  CALL TAG_BAND(NX, NY, IX, IY, T+DT)
-                  PHIP           (IX,IY) = -1.0
-                  ! Record firebrand ignited cells
-                  IF (DEBUG_LEVEL .GT. 0) WRITE(*,*) 'Firebrand Ignited', IX, IY, FBFM%I2(IX,IY,1)
-                  CALL DELETE_NODE(LIST_EMBER_DEPOSITED, C)
-
-               ENDIF
-            ENDIF
-            C => C%NEXT
-         ENDDO
+      ! Main call to ember trajectory integration and ignition determination
+         ICOL = ICOL_ANALYSIS_F2C(IX)
+         IROW = IROW_ANALYSIS_F2C(IY)
+         WS20 = WS20_LO(ICOL,IROW) * (1. - F_METEOROLOGY) + F_METEOROLOGY * WS20_HI(ICOL,IROW)
+         
+         CALL EULERIAN_SPOTTING_MAIN(NX, NY, ANALYSIS_CELLSIZE, T, DT, WS20)
+         
       ELSE
          DO I = 1, NUM_TRACKED_EMBERS
             IF (.NOT. SPOTTING_STATS(I)%POSITIVE_IGNITION ) CYCLE
@@ -1431,6 +1345,10 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
       TRANSIENT_RADIATION_WUI(:,:) = 0.
       HRR_TRANSIENT_MAP(:,:) = 0.
    ENDIF
+#endif
+
+#ifdef _UMDSPOTTING
+   EMBER_FLUX_TRANSIENT%R4(:,:,1)=0.
 #endif
 
    CALL ACCUMULATE_CPU_USAGE(56, IT1, IT2)
@@ -2413,6 +2331,74 @@ ENDDO
 END SUBROUTINE UNTAG_CELLS_WUI
 ! *****************************************************************************
 #endif
+
+#ifdef _UMDSPOTTING
+! *****************************************************************************
+SUBROUTINE EULERIAN_SPOTTING_MAIN(NX_ELM, NY_ELM, CELLSIZE_ELM, T_ELMFIRE, DT_ELMFIRE, WS20)
+! *****************************************************************************
+! Main call to ember trajectory integration and ignition determination
+USE ELMFIRE_VARS
+
+REAL, INTENT(IN) :: CELLSIZE_ELM, T_ELMFIRE, DT_ELMFIRE, WS20
+INTEGER, INTENT(IN) :: NX_ELM, NY_ELM
+
+TYPE (NODE), POINTER :: C
+INTEGER :: IX, IY
+
+C => LIST_EMBER_TRACKER%HEAD
+! Move all trackers forward by 1 level-set time step (tracker trajectories are solved using smaller time steps)
+! It avoids allocating a big table to memorize firebrands will be deposited in the future steps.
+DO
+   IF (LIST_EMBER_TRACKER%NUM_NODES .LE. 0) EXIT
+   IF (.NOT. ASSOCIATED(C)) EXIT
+   CALL EMBER_TRAJECTORY_EULERIAN(NX_ELM, NY_ELM, CELLSIZE_ELM, C, T_ELMFIRE, DT_ELMFIRE)
+
+   IF(C%TARGET_ARRIVED) THEN
+      CALL DELETE_NODE(LIST_EMBER_TRACKER, C)
+   ENDIF
+   C => C%NEXT
+ENDDO
+
+C => LIST_EMBER_DEPOSITED%HEAD
+DO 
+   IF (LIST_EMBER_DEPOSITED%NUM_NODES .LE. 0) EXIT
+   IF (.NOT. ASSOCIATED(C)) EXIT
+   IX = C%IX
+   IY = C%IY
+   CALL EMBER_CONSUMPTION(IX, IY, T_ELMFIRE, DT_ELMFIRE)
+
+   IF(PHIP(IX,IY) .GE. 0 .AND. SURFACE_FIRE(IX,IY) .LE. 0) THEN
+      IF (USE_EMBER_IGNITION_MODEL) THEN
+         ! Ignite the target according to the physics-based model
+         IF (.NOT. EMBER_IGNITION(IX,IY,T_ELMFIRE, DT_ELMFIRE, WS20, LOCAL_IGNITION_TIME, CELL_IGNITION_DELAY)) THEN
+            C => C%NEXT
+            CYCLE
+         ENDIF
+
+      ELSE
+         ! Ignite the target immediately if any firebrand landed
+         IF (ABS(EMBER_TIGN(IX,IY) - T_ELMFIRE-DT_ELMFIRE) .GE. 0.5*DT_ELMFIRE .OR. EMBER_TIGN(IX,IY) .LT. 0) THEN
+            C => C%NEXT
+            CYCLE
+         ENDIF
+      ENDIF
+
+      IF (ADJ%R4(IX,IY,1) .GT. 0. .AND. (.NOT. ISNONBURNABLE(IX,IY) ) ) THEN
+         CALL TAG_BAND(NX_ELM, NY_ELM, IX, IY, T_ELMFIRE+DT_ELMFIRE)
+         PHIP           (IX,IY) = -1.0
+         ! Record firebrand ignited cells
+         IF (DEBUG_LEVEL .GT. 0) WRITE(*,*) 'Firebrand Ignited', IX, IY, FBFM%I2(IX,IY,1)
+         CALL DELETE_NODE(LIST_EMBER_DEPOSITED, C) ! Remove ignited cells
+      ENDIF
+   ENDIF
+   C => C%NEXT
+ENDDO
+
+! *****************************************************************************
+END SUBROUTINE EULERIAN_SPOTTING_MAIN
+! *****************************************************************************
+#endif
+
 ! *****************************************************************************
 END MODULE
 ! *****************************************************************************
