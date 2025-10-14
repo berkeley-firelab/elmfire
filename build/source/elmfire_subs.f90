@@ -1054,20 +1054,15 @@ INTEGER, INTENT(IN)      :: IX, IY
 REAL, INTENT(IN) :: T
  
 TYPE(NODE), POINTER :: NP
-! TYPE(NODE_WRAPPER), ALLOCATABLE :: TEMP(:)  ! Temporary array for resizing DWI_SU
-INTEGER :: N  ! Store the new count DWI_SU
 
 ! If the list is empty
 IF (DL2%NUM_NODES == 0) THEN
    CALL INIT(DL2, IX, IY, T)
-   ALLOCATE(DL2%NODE_POINTERS(1))      ! DWI_SU
-   DL2%NODE_POINTERS(1)%PTR => DL2%HEAD   ! DWI_SU
    RETURN
 END IF
  
 ! Add new element ot the end
 DL2%NUM_NODES = DL2%NUM_NODES + 1
-N = SIZE(DL2%NODE_POINTERS)+1  ! Store the new count DWI_SU
 
 NP => DL2%TAIL
 ALLOCATE(DL2%TAIL)
@@ -1093,19 +1088,6 @@ DL2%TAIL%TANSLP2 =  TANSLP2(MAX(MIN(NINT(SLP%R4(IX,IY,1)),90),0))
 DL2%TAIL%PREV       => NP
 DL2%TAIL%PREV%NEXT  => DL2%TAIL
 
-#ifdef _WUI
-! ! Resize NODE_POINTERS array dynamically DWI_SU
-! ALLOCATE(TEMP(N-1))
-! TEMP = DL2%NODE_POINTERS
-! DEALLOCATE(DL2%NODE_POINTERS)
-! ALLOCATE(DL2%NODE_POINTERS(N))
-! DL2%NODE_POINTERS(1:N-1) = TEMP
-! DEALLOCATE(TEMP) 
-
-! ! Store the new node in the array DWI_SU
-! NULLIFY(DL2%NODE_POINTERS(N)%PTR)
-! DL2%NODE_POINTERS(N)%PTR => DL2%TAIL
-#endif
 ! *****************************************************************************   
 END SUBROUTINE APPEND
 ! *****************************************************************************
