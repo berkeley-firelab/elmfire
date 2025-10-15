@@ -414,10 +414,6 @@ IF (.NOT. RANDOM_IGNITIONS) THEN
          ENDIF
 #endif
 
-! #ifdef _UMDSPOTTING
-!          IF (USE_UMD_SPOTTING_MODEL) LIST_BURNED%TAIL%TAU_EMBERGEN = 0.
-! #endif
-
 #ifdef _SUPPRESSION
          IF (ENABLE_EXTENDED_ATTACK .AND. USE_SDI) C%SDI = SDI_FACTOR * SDI%R4(ICOL,IROW,1)
 #endif
@@ -1043,8 +1039,8 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
                CONTINUE
             ENDIF
             IF (CALL_SPOTTING) THEN ! If using Eulerian firebrand solver, no trajectory calculated at this step, only initiate trackers
-               CALL SPOTTING(C%IX,C%IY,C%WS20_NOW,FLIN, N_SPOT_FIRES, IX_SPOT_FIRE, IY_SPOT_FIRE, &
-                             ICASE, DT, T, TAU, SOURCE_FUEL_IGN_MULT(FBFM%I2(C%IX,C%IY,1)),  C%IFBFM, LIST_EMBER_TRACKER)
+               CALL SPOTTING(C%IX,C%IY,C%WS20_NOW,FLIN, N_SPOT_FIRES, IX_SPOT_FIRE, IY_SPOT_FIRE, ICASE, DT, T, &
+                             C%T_END_SPOTTING-T, SOURCE_FUEL_IGN_MULT(FBFM%I2(C%IX,C%IY,1)),  C%IFBFM, LIST_EMBER_TRACKER)
             ENDIF
          ENDIF
          ! C%TAU_EMBERGEN = MIN (TAU_EMBERGEN, C%TAU_EMBERGEN + DT)
@@ -1108,7 +1104,7 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
             CALL TAG_BAND(NX, NY, IX, IY, T)
             TIME_OF_ARRIVAL(IX,IY) = T
             PHIP           (IX,IY) = -1.0
-            IF (DUMP_EMBER_IGNITION) EMBER_IGNITION%I2(IX,IY,1) = 1
+            IF (DUMP_EMBER_IGNITION) EMBER_IGNITION_MAP%I2(IX,IY,1) = 1
          ENDIF
       ENDDO
    ENDIF
@@ -1361,10 +1357,6 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
       TRANSIENT_RADIATION_WUI(:,:) = 0.
       HRR_TRANSIENT_MAP(:,:) = 0.
    ENDIF
-#endif
-
-#ifdef _UMDSPOTTING
-   IF (DUMP_EMBER_FLUX_TRANSIENT) EMBER_FLUX_TRANSIENT%R4(:,:,1)=0.
 #endif
 
    CALL ACCUMULATE_CPU_USAGE(56, IT1, IT2)
@@ -2388,7 +2380,7 @@ DO
 
       ELSE
          ! Ignite the target immediately if any firebrand landed
-         IF (ABS(EMBER_TIGN(IX,IY) - T_ELMFIRE-DT_ELMFIRE) .GE. 0.5*DT_ELMFIRE .OR. EMBER_TIGN(IX,IY) .LT. 0) THEN
+         IF (EMBER_TIGN(IX,IY) .GT. T_ELMFIRE+DT_ELMFIRE .OR. EMBER_TIGN(IX,IY) .LT. 0) THEN
             C => C%NEXT
             CYCLE
          ENDIF
@@ -2398,7 +2390,7 @@ DO
          CALL TAG_BAND(NX_ELM, NY_ELM, IX, IY, T_ELMFIRE+DT_ELMFIRE)
          PHIP           (IX,IY) = -1.0
          ! Record firebrand ignited cells
-         IF (DUMP_EMBER_IGNITION) EMBER_IGNITION%I2(IX,IY,1) = 1
+         IF (DUMP_EMBER_IGNITION) EMBER_IGNITION_MAP%I2(IX,IY,1) = 1
          CALL DELETE_NODE(LIST_EMBER_DEPOSITED, C) ! Remove ignited cells
       ENDIF
    ENDIF
