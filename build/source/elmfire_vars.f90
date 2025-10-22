@@ -607,6 +607,7 @@ TYPE NODE
    REAL :: SIGMA_CROSSWIND_LOCAL    = 0.
    REAL :: MU_CROSSWIND_LOCAL       = 0.
    REAL :: DIST                     = 0.
+   REAL :: TIME_ACTUAL              = -1.
 ! Target cells
    REAL :: T_LOCAL_IGNITION         = -1.
    LOGICAL :: FULL_DEV_IGNITION     = .FALSE.
