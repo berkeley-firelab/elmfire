@@ -281,7 +281,7 @@ IF (.NOT. RUN) THEN
    STATS_SIMULATION_TSTOP_HOURS     (ICASE) = -9999.
    STATS_PM2P5_RELEASE              (ICASE) = 0.
    STATS_HRR_PEAK                   (ICASE) = 0.
-   RETURN
+   TSTOP = SIMULATION_TSTART + 0.01
 ENDIF
 
 CALL ACCUMULATE_CPU_USAGE(31, IT1, IT2)
@@ -862,21 +862,15 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
 
 ! Calculate x and y components of velocity from elliptical spread dimensions
       CALL UX_AND_UY_ELLIPTICAL(LIST_TAGGED, SURFACE_ACCELERATION_FACTOR, ISTEP, T)
+      CALL ACCUMULATE_CPU_USAGE(42, IT1, IT2)
+
+! Check CFL criterion, adjust timestep, AND apply flux limiter (merged)
+      CALL CFL_AND_FLUX_LIMITER(DT, RCELLSIZE, PHIP, ISTEP, ITIMESTEP)
       CALL ACCUMULATE_CPU_USAGE(43, IT1, IT2)
-
-! Check CFL criterion and adjust timestep
-      IF (ISTEP .EQ. 1 .AND. ITIMESTEP .GT. 5) THEN
-         CALL CALC_CFL(DT)
-         CALL ACCUMULATE_CPU_USAGE(44, IT1, IT2)
-      ENDIF
-
-! Apply flux limiter
-      CALL LIMIT_GRADIENTS(RCELLSIZE, PHIP)
-      CALL ACCUMULATE_CPU_USAGE(45, IT1, IT2)
 
 ! 2nd order Runge Kutta integration:
       CALL RK2_INTEGRATE(DT, ISTEP)
-      CALL ACCUMULATE_CPU_USAGE(46, IT1, IT2)
+      CALL ACCUMULATE_CPU_USAGE(44, IT1, IT2)
 
    ENDDO !ISTEP=1,2
 
@@ -916,6 +910,7 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
          ENDIF
 
          CALL APPEND(LIST_BURNED, IX, IY, T)
+         CALL APPEND_TO_DYNAMIC_ARRAY(IX, IY, LIST_BURNED%NUM_NODES, DYNAMIC_ARRAY)   !DWI_SU
 
          LIST_BURNED%TAIL%IR                     = C%IR
          LIST_BURNED%TAIL%VS0                    = C%VS0
@@ -1058,7 +1053,6 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
    ENDDO
 
    IF (USE_UMD_SPOTTING_MODEL) THEN
-
       IF (USE_EULERIAN_SPOTTING) THEN
       ! Main call to ember trajectory integration and ignition determination
          ICOL = ICOL_ANALYSIS_F2C(IX)
@@ -1066,7 +1060,6 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
          WS20 = WS20_LO(ICOL,IROW) * (1. - F_METEOROLOGY) + F_METEOROLOGY * WS20_HI(ICOL,IROW)
          
          CALL EULERIAN_SPOTTING_MAIN(NX, NY, ANALYSIS_CELLSIZE, T, DT, WS20)
-         
       ELSE
          DO I = 1, NUM_TRACKED_EMBERS
             IF (.NOT. SPOTTING_STATS(I)%POSITIVE_IGNITION ) CYCLE
@@ -1174,7 +1167,7 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
          STATS_SIMULATION_TSTOP_HOURS(ICASE) = INITIAL_ATTACK_TIME / 3600.0
       ENDIF
    ENDIF
-   
+
    CALL ACCUMULATE_CPU_USAGE(51, IT1, IT2)
 
 ! Untag
@@ -1388,6 +1381,7 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
    ENDIF
 
    CALL ACCUMULATE_CPU_USAGE(57, IT1, IT2)
+
 ENDDO !T < TSTOP
 ! End main timestepping loop
 
@@ -1462,6 +1456,7 @@ IF (DUMP_FIRE_SIZE_STATS) THEN
                   SURFACE_FIRE(I,J) = 1
 
                   CALL APPEND(LIST_BURNED, I, J, T)
+                  CALL APPEND_TO_DYNAMIC_ARRAY(I, J, LIST_BURNED%NUM_NODES, DYNAMIC_ARRAY) ! Yiren DEBUG
 
                   STATS_SURFACE_FIRE_AREA(ICASE) = STATS_SURFACE_FIRE_AREA(ICASE) + ACRES_PER_PIXEL
                   STATS_AFFECTED_POPULATION(ICASE) = STATS_AFFECTED_POPULATION(ICASE) + POPULATION_DENSITY%R4(I,J,1)
@@ -1558,7 +1553,7 @@ IF (USE_EMBER_COUNT_BINS) THEN
    DO IY = 1, NY
    DO IX = 1, NX
       IF (EMBER_COUNT(IX,IY) .GT. 0) THEN
-         ICOUNT = ICOUNT + 1
+         ICOUNT = MIN(ICOUNT + 1, INT(STATS_NEMBERS(ICASE)))
          EMBER_OUTPUTS_IX   (ICOUNT) = IX
          EMBER_OUTPUTS_IY   (ICOUNT) = IY
          EMBER_OUTPUTS_COUNT(ICOUNT) = EMBER_COUNT(IX,IY)
@@ -1624,7 +1619,7 @@ IF (LIST_BURNED%NUM_NODES .GT.     0) THEN
 !   ENDDO
 ENDIF
 
-IF (LIST_SUPPRESSED%NUM_NODES .GT. 0) THEN
+IF (LIST_SUPPRESSED%NUM_NODES .GT. 0) THEN 
    CALL TIDY(LIST_SUPPRESSED)
    LIST_SUPPRESSED%NUM_NODES=0
 !   C => LIST_SUPPRESSED%HEAD
@@ -1842,6 +1837,7 @@ END SUBROUTINE CALC_NORMAL_VECTORS
 ! *****************************************************************************
 
 ! *****************************************************************************
+<<<<<<< HEAD
 SUBROUTINE UX_AND_UY_ELLIPTICAL(L, ACCELERATION_FACTOR, ISTEP, T_ELMFIRE)
 ! *****************************************************************************
 ! Parameter T_ELMFIRE added to update fireline intensity of structures over time
@@ -1956,7 +1952,7 @@ IF (ISTEP .EQ. 1) THEN
 
             DYDT_ROTATED = DYDT*C%NORMVECTORY_DMS - DXDT*C%NORMVECTORX_DMS !ft/min, parallel to slope
             C%UY = DYDT_ROTATED * C%UYOUSY * FTPMIN_TO_MPS !m/s, projected
-
+            
             C%VELOCITY = SQRT(DXDT_ROTATED*DXDT_ROTATED + DYDT_ROTATED*DYDT_ROTATED) ! ft/min, parallel to slope
 
             ILH = MAX(MIN(NINT(100.*C%MLH),120),30)
@@ -2020,7 +2016,6 @@ ELSE !ISTEP .EQ. 2
 
          IF (CROWN_FIRE_MODEL .GT. 0 .AND. C%FLIN_SURFACE .GE. C%CRITICAL_FLIN) C%FLIN_CANOPY = C%HPUA_CANOPY * C%VELOCITY * 5.08E-3
 
-
 #ifdef _UMDSPOTTING
          IF (USE_UMD_SPOTTING_MODEL .AND. USE_PHYSICAL_SPOTTING_DURATION) THEN
             IF(ABS(C%UX)> 1E-3 .AND. ABS(C%UY)> 1E-3) C%LOCAL_EMBERGEN_DURATION = ANALYSIS_CELLSIZE/MIN(ABS(C%UX), ABS(C%UY)) ! seconds
@@ -2046,41 +2041,6 @@ ENDIF !ISTEP .EQ. 1
 
 ! *****************************************************************************
 END SUBROUTINE UX_AND_UY_ELLIPTICAL
-! *****************************************************************************
-
-! *****************************************************************************
-SUBROUTINE CALC_CFL(DT)
-! *****************************************************************************
-
-REAL, INTENT(INOUT) :: DT
-INTEGER :: I
-REAL :: CFL, U, UX, UY, UMAX
-TYPE(NODE), POINTER :: C
-
-UMAX = 0.
-C => LIST_TAGGED%HEAD
-DO I = 1, LIST_TAGGED%NUM_NODES
-   IF (.NOT. C%BURNED) THEN
-      UX=ABS(C%UX)
-      UY=ABS(C%UY)
-      U=MAX(UX,UY)
-      ! APPLY WIND-BASED CFL
-      ! U=MAX(U, C%WS20_NOW*0.447)
-      IF (U .GT. UMAX) UMAX = U
-   ENDIF
-   C => C%NEXT
-ENDDO
-
-CFL = UMAX * DT / ANALYSIS_CELLSIZE
-IF (CFL .GT. 0.) THEN
-   DT = MIN(TARGET_CFL * DT / CFL, SIMULATION_DTMAX)
-ELSE
-   DT = SIMULATION_DTMAX
-ENDIF
-CONTINUE
-
-! *****************************************************************************
-END SUBROUTINE CALC_CFL
 ! *****************************************************************************
 
 ! *****************************************************************************
@@ -2124,100 +2084,141 @@ END SUBROUTINE RK2_INTEGRATE
 ! *****************************************************************************
 
 ! *****************************************************************************
-SUBROUTINE LIMIT_GRADIENTS(RCELLSIZE,PHI)
+SUBROUTINE CFL_AND_FLUX_LIMITER(DT, RCELLSIZE, PHI, ISTEP, ITIMESTEP)
 ! *****************************************************************************
+! This subroutine merges the former CALC_CFL and LIMIT_GRADIENTS subroutines
+! to reduce loops through LIST_TAGGED
+! Contributed by Adam Laird (adam.laird@berkeley.edu)
 
+! Inputs
 REAL, INTENT(IN) :: RCELLSIZE
 REAL, DIMENSION(:,:), INTENT(IN) :: PHI
+INTEGER, INTENT(IN) :: ISTEP, ITIMESTEP
 
+! In/Out
+REAL, INTENT(INOUT) :: DT
+
+! Locals
+REAL :: CFL, COND, UMAX
+REAL, PARAMETER :: EPSILON = 1E-30, CEILING = 1E3
 INTEGER :: I
-REAL :: DELTAUP, DELTALOC, PHIEAST=1.0, PHIWEST=1.0, PHINORTH=1.0, PHISOUTH=1.0
-REAL, PARAMETER :: EPSILON = 1E-30
-REAL, PARAMETER :: CEILING = 1E3
 TYPE(NODE), POINTER :: C
 
-C => LIST_TAGGED%HEAD
-DO I = 1, LIST_TAGGED%NUM_NODES
-         
-   IF (C%UX .GE. 0E0) THEN
+UMAX = 0.
+ C => LIST_TAGGED%HEAD
 
-! PHIEAST
-      DELTAUP  = PHI(C%IX,  C%IY) - PHI(C%IX-1,C%IY)
-      DELTALOC = PHI(C%IX+1,C%IY) - PHI(C%IX  ,C%IY)
-      IF (ABS(DELTALOC) > EPSILON) PHIEAST = PHI(C%IX,C%IY) + HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
-
-! PHIWEST
-      DELTALOC = -DELTAUP
-      IF (ABS(DELTALOC) > EPSILON) THEN
-         DELTAUP = PHI(C%IX-2,C%IY) - PHI(C%IX-1,C%IY)
-         PHIWEST = PHI(C%IX-1,C%IY) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+IF (ISTEP .EQ. 1 .AND. ITIMESTEP .GT. 5) THEN
+   DO I = 1, LIST_TAGGED%NUM_NODES
+      ! Calculate UMAX Condition for CFL
+      IF (.NOT. C%BURNED) THEN
+         COND = MAX(ABS(C%UX),ABS(C%UY))
+         IF (COND .GT. UMAX) UMAX = COND
       ENDIF
 
-   ELSE ! UX .LT. 0
+      CALL LIMIT_GRADIENTS(C)
 
-! PHIEAST
-      DELTALOC = PHI(C%IX+1,C%IY) - PHI(C%IX, C%IY)      
-      IF (ABS(DELTALOC) > EPSILON) THEN    
-         DELTAUP  = PHI(C%IX+2,C%IY) - PHI(C%IX+1,C%IY)
-         PHIEAST = PHI(C%IX+1,C%IY) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
-      ENDIF
+      C => C%NEXT
+   ENDDO !I=1, LIST_TAGGED%NUM_NODE
+ELSE
+   DO I = 1, LIST_TAGGED%NUM_NODES
+      CALL LIMIT_GRADIENTS(C)
+      C => C%NEXT
+   ENDDO !I=1, LIST_TAGGED%NUM_NODE
+ENDIF
 
-! PHIWEST
-      DELTAUP  = -DELTALOC
-      DELTALOC = PHI(C%IX-1,C%IY) - PHI(C%IX,C%IY)
-      IF (ABS(DELTALOC) > EPSILON) PHIWEST = PHI(C%IX,C%IY)+ HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
-
+! Calculate Time Step Size based on CFL
+IF (ISTEP .EQ. 1 .AND. ITIMESTEP .GT. 5) THEN
+   CFL = UMAX * DT / ANALYSIS_CELLSIZE
+   IF (CFL .GT. 0.) THEN
+      DT = MIN(TARGET_CFL * DT / CFL, SIMULATION_DTMAX)
+   ELSE
+      DT = SIMULATION_DTMAX
    ENDIF
+ENDIF
 
-   C%DPHIDX_LIMITED = (PHIEAST  - PHIWEST) * RCELLSIZE
+CONTAINS
+   SUBROUTINE LIMIT_GRADIENTS(C)
+      TYPE(NODE), POINTER :: C
+      REAL :: DELTAUP, DELTALOC, PHIEAST=1.0, PHIWEST=1.0, PHINORTH=1.0, PHISOUTH=1.0
 
-   IF (C%UY .GT. 0E0) THEN
+      ! Apply flux limiter
+      IF (C%UX .GE. 0E0) THEN
 
-! PHINORTH
-      DELTAUP  = PHI(C%IX,C%IY) - PHI(C%IX,C%IY-1)
-      DELTALOC = PHI(C%IX,C%IY+1) - PHI(C%IX,C%IY)      
-      IF (ABS(DELTALOC) > EPSILON) PHINORTH = PHI(C%IX,C%IY) + HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+         ! PHIEAST
+         DELTAUP  = PHI(C%IX,  C%IY) - PHI(C%IX-1,C%IY)
+         DELTALOC = PHI(C%IX+1,C%IY) - PHI(C%IX  ,C%IY)
+         IF (ABS(DELTALOC) > EPSILON) PHIEAST = PHI(C%IX,C%IY) + HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
 
-! PHISOUTH
-      DELTALOC = -DELTAUP      
-      IF (ABS(DELTALOC) .GT. EPSILON) THEN
-         DELTAUP  = PHI(C%IX,C%IY-2) - PHI(C%IX,C%IY-1)
-         PHISOUTH = PHI(C%IX,C%IY-1) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+         ! PHIWEST
+         DELTALOC = -DELTAUP
+         IF (ABS(DELTALOC) > EPSILON) THEN
+            DELTAUP = PHI(C%IX-2,C%IY) - PHI(C%IX-1,C%IY)
+            PHIWEST = PHI(C%IX-1,C%IY) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+         ENDIF
+
+      ELSE ! UX .LT. 0
+
+         ! PHIEAST
+         DELTALOC = PHI(C%IX+1,C%IY) - PHI(C%IX, C%IY)      
+         IF (ABS(DELTALOC) > EPSILON) THEN    
+            DELTAUP  = PHI(C%IX+2,C%IY) - PHI(C%IX+1,C%IY)
+            PHIEAST = PHI(C%IX+1,C%IY) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+         ENDIF
+
+         ! PHIWEST
+         DELTAUP  = -DELTALOC
+         DELTALOC = PHI(C%IX-1,C%IY) - PHI(C%IX,C%IY)
+         IF (ABS(DELTALOC) > EPSILON) PHIWEST = PHI(C%IX,C%IY)+ HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+
       ENDIF
 
-   ELSE !UY .LT. 0
+      C%DPHIDX_LIMITED = (PHIEAST  - PHIWEST) * RCELLSIZE
 
-! PHINORTH
-      DELTALOC = PHI(C%IX,C%IY+1) - PHI(C%IX,C%IY  )
-      IF (ABS(DELTALOC) > EPSILON) THEN
-         DELTAUP  = PHI(C%IX,C%IY+2) - PHI(C%IX,C%IY+1)
-         PHINORTH = PHI(C%IX,C%IY+1) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+      IF (C%UY .GT. 0E0) THEN
+
+         ! PHINORTH
+         DELTAUP  = PHI(C%IX,C%IY) - PHI(C%IX,C%IY-1)
+         DELTALOC = PHI(C%IX,C%IY+1) - PHI(C%IX,C%IY)      
+         IF (ABS(DELTALOC) > EPSILON) PHINORTH = PHI(C%IX,C%IY) + HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+
+         ! PHISOUTH
+         DELTALOC = -DELTAUP      
+         IF (ABS(DELTALOC) .GT. EPSILON) THEN
+            DELTAUP  = PHI(C%IX,C%IY-2) - PHI(C%IX,C%IY-1)
+            PHISOUTH = PHI(C%IX,C%IY-1) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+         ENDIF
+
+      ELSE !UY .LT. 0
+
+         ! PHINORTH
+         DELTALOC = PHI(C%IX,C%IY+1) - PHI(C%IX,C%IY  )
+         IF (ABS(DELTALOC) > EPSILON) THEN
+            DELTAUP  = PHI(C%IX,C%IY+2) - PHI(C%IX,C%IY+1)
+            PHINORTH = PHI(C%IX,C%IY+1) - HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+         ENDIF
+
+         ! PHISOUTH
+         DELTAUP  = -DELTALOC
+         DELTALOC = PHI(C%IX,C%IY-1) - PHI(C%IX,C%IY)
+         IF (ABS(DELTALOC) > EPSILON) PHISOUTH = PHI(C%IX,C%IY) + HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+
       ENDIF
 
-! PHISOUTH
-      DELTAUP  = -DELTALOC
-      DELTALOC = PHI(C%IX,C%IY-1) - PHI(C%IX,C%IY)
-      IF (ABS(DELTALOC) > EPSILON) PHISOUTH = PHI(C%IX,C%IY) + HALF_SUPERBEE(DELTAUP / DELTALOC)*DELTALOC
+      C%DPHIDY_LIMITED = (PHINORTH - PHISOUTH) * RCELLSIZE
 
-   ENDIF
+      IF (C%DPHIDX_LIMITED .GT.  CEILING) C%DPHIDX_LIMITED = CEILING
+      IF (C%DPHIDY_LIMITED .GT.  CEILING) C%DPHIDY_LIMITED = CEILING
 
-   C%DPHIDY_LIMITED = (PHINORTH - PHISOUTH) * RCELLSIZE
+      IF (C%DPHIDX_LIMITED .LT. -CEILING) C%DPHIDX_LIMITED = -CEILING
+      IF (C%DPHIDY_LIMITED .LT. -CEILING) C%DPHIDY_LIMITED = -CEILING
 
-   IF (C%DPHIDX_LIMITED .GT.  CEILING) C%DPHIDX_LIMITED = CEILING
-   IF (C%DPHIDY_LIMITED .GT.  CEILING) C%DPHIDY_LIMITED = CEILING
+      IF (C%DPHIDX_LIMITED .NE.  C%DPHIDX_LIMITED) C%DPHIDX_LIMITED = 0.
+      IF (C%DPHIDY_LIMITED .NE.  C%DPHIDY_LIMITED) C%DPHIDY_LIMITED = 0.
 
-   IF (C%DPHIDX_LIMITED .LT. -CEILING) C%DPHIDX_LIMITED = -CEILING
-   IF (C%DPHIDY_LIMITED .LT. -CEILING) C%DPHIDY_LIMITED = -CEILING
-
-   IF (C%DPHIDX_LIMITED .NE.  C%DPHIDX_LIMITED) C%DPHIDX_LIMITED = 0.
-   IF (C%DPHIDY_LIMITED .NE.  C%DPHIDY_LIMITED) C%DPHIDY_LIMITED = 0.
-
-   C => C%NEXT
-
-ENDDO !I=1, LIST_TAGGED%NUM_NODES
+   END SUBROUTINE LIMIT_GRADIENTS
 
 ! *****************************************************************************
-END SUBROUTINE LIMIT_GRADIENTS
+END SUBROUTINE CFL_AND_FLUX_LIMITER
 ! *****************************************************************************
 
 #ifdef _WUI

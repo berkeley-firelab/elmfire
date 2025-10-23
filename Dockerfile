@@ -55,7 +55,7 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir google-cloud-storage crcmod
 
 # ---- Environment ----
-ENV ELMFIRE_VER=2025.0717 \
+ENV ENV ELMFIRE_VER=2025.1002 \
     ELMFIRE_BASE_DIR=/elmfire/elmfire \
     ELMFIRE_SCRATCH_BASE=/scratch/elmfire \
     ELMFIRE_INSTALL_DIR=/elmfire/elmfire/build/linux/bin \
