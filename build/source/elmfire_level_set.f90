@@ -2404,7 +2404,6 @@ DO
       ENDIF
 
       IF (ADJ%R4(IX,IY,1) .GT. 0. .AND. (.NOT. ISNONBURNABLE(IX,IY) ) ) THEN
-         WRITE(*,*) IX,IY,EMBER_TIGN(IX,IY), T_ELMFIRE+DT_ELMFIRE
          CALL TAG_BAND(NX_ELM, NY_ELM, IX, IY, T_ELMFIRE+DT_ELMFIRE)
          PHIP           (IX,IY) = -1.0
          ! Record firebrand ignited cells
