@@ -374,13 +374,13 @@ IF (.NOT. RANDOM_IGNITIONS) THEN
    DO IY = 1, NY
    DO IX = 1, NX
       IF (PHIP(IX,IY) .LE. 0.) THEN
+
          SURFACE_FIRE(IX,IY) = 1
          ACRES = ACRES + ACRES_PER_PIXEL
          TIME_OF_ARRIVAL(IX,IY) = MAX(0.,SIMULATION_TSTART)+DT
          ICOUNT = ICOUNT + 1
 
          CALL APPEND(LIST_BURNED, IX, IY, T)
-         ! CALL APPEND_TO_DYNAMIC_ARRAY(IX, IY, LIST_BURNED%NUM_NODES, DYNAMIC_ARRAY)
 
          IF (WX_BILINEAR_INTERPOLATION) THEN
             CALL INTERP_RASTER_LINKEDLIST_SINGLE_BILINEAR (LIST_BURNED%TAIL, M1_LO  (:,:), M1_HI  (:,:), F_METEOROLOGY, 1)
@@ -607,7 +607,6 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
             ! Tag WUI cells
             CALL TAG_WUI(NX, NY, IX_IGN, IY_IGN, T) 
          ENDIF
-         ! CALL APPEND_TO_DYNAMIC_ARRAY(IX_IGN,IY_IGN, LIST_BURNED%NUM_NODES, DYNAMIC_ARRAY)
       ENDIF
    ENDIF
 
@@ -877,14 +876,13 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
 ! Find newly-burned cells and call spotting:
    N_TO_TAG = 0
    N_SPOT_FIRES = 0
-   
    C => LIST_TAGGED%HEAD
    DO I = 1, LIST_TAGGED%NUM_NODES
       IX = C%IX
       IY = C%IY
 
       IF (PHIP(IX,IY) .LE. 0. .AND. SURFACE_FIRE(IX,IY) .EQ. 0) THEN
-      
+         
          ACRES = ACRES + ACRES_PER_PIXEL
 #ifdef _SUPPRESSION
          IF (ENABLE_EXTENDED_ATTACK) THEN
@@ -908,9 +906,7 @@ DO WHILE (T .LE. TSTOP .OR. IDUMPCOUNT .LE. NDUMPS)
          ELSE
             C%FLAME_LENGTH = 0.
          ENDIF
-
          CALL APPEND(LIST_BURNED, IX, IY, T)
-         CALL APPEND_TO_DYNAMIC_ARRAY(IX, IY, LIST_BURNED%NUM_NODES, DYNAMIC_ARRAY)   !DWI_SU
 
          LIST_BURNED%TAIL%IR                     = C%IR
          LIST_BURNED%TAIL%VS0                    = C%VS0
@@ -1456,7 +1452,6 @@ IF (DUMP_FIRE_SIZE_STATS) THEN
                   SURFACE_FIRE(I,J) = 1
 
                   CALL APPEND(LIST_BURNED, I, J, T)
-                  CALL APPEND_TO_DYNAMIC_ARRAY(I, J, LIST_BURNED%NUM_NODES, DYNAMIC_ARRAY) ! Yiren DEBUG
 
                   STATS_SURFACE_FIRE_AREA(ICASE) = STATS_SURFACE_FIRE_AREA(ICASE) + ACRES_PER_PIXEL
                   STATS_AFFECTED_POPULATION(ICASE) = STATS_AFFECTED_POPULATION(ICASE) + POPULATION_DENSITY%R4(I,J,1)
@@ -1837,7 +1832,6 @@ END SUBROUTINE CALC_NORMAL_VECTORS
 ! *****************************************************************************
 
 ! *****************************************************************************
-<<<<<<< HEAD
 SUBROUTINE UX_AND_UY_ELLIPTICAL(L, ACCELERATION_FACTOR, ISTEP, T_ELMFIRE)
 ! *****************************************************************************
 ! Parameter T_ELMFIRE added to update fireline intensity of structures over time
