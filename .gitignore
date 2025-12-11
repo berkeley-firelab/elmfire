@@ -47,6 +47,7 @@ ask_rag.py
 .rag_db
 rag_db
 .webui_secret_key
+vnv_suite
 
 .DS_Store
 .ipynb_checkpoints

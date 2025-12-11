@@ -20,6 +20,7 @@ COPY . /elmfire/elmfire
 
 # Build elmfire
 WORKDIR /elmfire/elmfire/build/linux
+RUN chmod +x ./make_gnu.sh
 RUN ./make_gnu.sh
 
 # -------- Stage 2: Runtime + VnV environment --------
@@ -55,11 +56,11 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir google-cloud-storage crcmod
 
 # ---- Environment ----
-ENV ENV ELMFIRE_VER=2025.1002 \
+ENV ELMFIRE_VER=2025.1002 \
     ELMFIRE_BASE_DIR=/elmfire/elmfire \
     ELMFIRE_SCRATCH_BASE=/scratch/elmfire \
     ELMFIRE_INSTALL_DIR=/elmfire/elmfire/build/linux/bin \
-    ELMFIRE_BIN=/elmfire/elmfire/build/linux/bin/elmfire \
+    ELMFIRE_BIN=/elmfire/elmfire/build/linux/bin/elmfire_debug \
     CLOUDFIRE_SERVER=worldgen.cloudfire.io \
     ROOT_DIR=/elmfire/elmfire/vnv_suite \
     PATH=$PATH:/elmfire/elmfire/build/linux/bin:/elmfire/elmfire/cloudfire
